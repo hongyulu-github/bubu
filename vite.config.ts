@@ -16,7 +16,9 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			// Budget editor URLs (/budgets/<uuid>) depend on browser-local data, so they cannot be
+			// prerendered. The host serves 200.html for any URL it has no file for (an SPA rewrite).
+			adapter: adapter({ fallback: '200.html' })
 		})
 	],
 	test: {
@@ -43,6 +45,17 @@ export default defineConfig({
 					environment: 'node',
 					include: ['src/**/*.{test,spec}.{js,ts}'],
 					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+				}
+			},
+			{
+				// End-to-end checks against the built static site (real router, reloads, SPA fallback).
+				test: {
+					name: 'e2e',
+					environment: 'node',
+					include: ['e2e/**/*.e2e.ts'],
+					globalSetup: ['./e2e/global-setup.ts'],
+					testTimeout: 30_000,
+					hookTimeout: 120_000
 				}
 			}
 		]

@@ -23,12 +23,14 @@ npx playwright install chromium   # once, for browser component tests
 | `npm run build` | Prerender the app to static files in `build/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run check` | Type-check with `svelte-check` |
-| `npm test` | Run unit tests (Node) and component tests (real Chromium) once |
+| `npm test` | Run unit tests (Node), component tests (real Chromium) and end-to-end tests against the built site, once. The e2e project runs `npm run build` itself |
 | `npm run test:unit` | Run the tests in watch mode |
 
 Layout: application code in `src/lib` (import via `#lib`), static routes in `src/routes`. Every route is prerendered (`src/routes/+layout.ts`), so code that touches browser globals such as `window` or `localStorage` must run inside `onMount`, an `$effect`, or an event handler, or the build will fail.
 
-Tests: `*.spec.ts` run in Node; `*.svelte.spec.ts` run in a real browser via `vitest-browser-svelte`. See `src/lib/smoke` for examples.
+Tests: `*.spec.ts` run in Node; `*.svelte.spec.ts` run in a real browser via `vitest-browser-svelte` (see `src/lib/smoke`); `e2e/*.e2e.ts` drive the built static site in Chromium with Playwright.
+
+Routes: `/budgets` lists saved Budgets and `/budgets/<uuid>` opens one. Budget URLs depend on browser-local data, so they are not prerendered: the build emits an SPA fallback (`200.html`) and **the host must serve `/200.html` for any URL it has no file for** (a rewrite; configure this when deploying).
 
 Design tokens and base components (`Button`, `Input`, `NumberInput`, `Dialog`, `TableCell`) are documented in [docs/design-foundation.md](docs/design-foundation.md), including source and license. Run `npm run dev` and open `/design` for a live preview.
 
