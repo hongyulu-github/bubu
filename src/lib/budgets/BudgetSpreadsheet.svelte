@@ -22,9 +22,13 @@
 		ondelete?: (itemId: string) => void;
 		/** Add a child inside this Item (a Line becomes a Group). Shows a row action when given. */
 		onaddchild?: (parentId: string) => void;
+		/** Ids of collapsed Groups, for the toggles' state. The caller passes only the rows to show. */
+		collapsed?: ReadonlySet<string>;
+		/** Collapse or expand a Group. Shows a toggle on every Group row when given. */
+		ontoggle?: (groupId: string) => void;
 	}
 
-	let { rows, currency, onedit, onadd, ondelete, onaddchild }: Props = $props();
+	let { rows, currency, onedit, onadd, ondelete, onaddchild, collapsed = new Set<string>(), ontoggle }: Props = $props();
 	const hasActions = $derived(onadd !== undefined || ondelete !== undefined || onaddchild !== undefined);
 </script>
 
@@ -75,11 +79,29 @@
 				<tr data-kind={row.kind} data-code={row.code} data-item-id={row.id}>
 					<TableCell readonly><span class="code">{row.code}</span></TableCell>
 					<TableCell depth={row.depth} strong={group}>
-						{#if onedit}
-							{@render editor(row, 'description', 'Description', row.item.description)}
-						{:else}
-							{row.item.description}
-						{/if}
+						<div class="description">
+							{#if ontoggle}
+								{#if group}
+									{@const open = !collapsed.has(row.id)}
+									<button
+										type="button"
+										class="toggle"
+										aria-expanded={open}
+										aria-label="{open ? 'Collapse' : 'Expand'} {row.code}"
+										onclick={() => ontoggle(row.id)}
+									>
+										<span aria-hidden="true" class="chevron" class:open></span>
+									</button>
+								{:else}
+									<span class="toggle-space" aria-hidden="true"></span>
+								{/if}
+							{/if}
+							{#if onedit}
+								{@render editor(row, 'description', 'Description', row.item.description)}
+							{:else}
+								{row.item.description}
+							{/if}
+						</div>
 					</TableCell>
 					<TableCell numeric>
 						{#if onedit}
@@ -147,6 +169,60 @@
 		overflow: hidden;
 		clip-path: inset(50%);
 		white-space: nowrap;
+	}
+
+	.description {
+		display: flex;
+		align-items: center;
+		gap: var(--space-1);
+	}
+
+	.toggle,
+	.toggle-space {
+		flex: none;
+		width: 1.75rem;
+		height: 1.75rem;
+	}
+
+	.toggle {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: none;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+	}
+
+	.toggle:hover {
+		background: var(--color-readonly-bg);
+		color: var(--color-text);
+	}
+
+	.toggle:focus-visible {
+		outline: var(--focus-ring-width) solid var(--color-focus-ring);
+		outline-offset: var(--focus-ring-offset);
+	}
+
+	.chevron {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-right: 2px solid currentColor;
+		border-bottom: 2px solid currentColor;
+		transform: rotate(-45deg); /* points right: collapsed */
+		transition: transform var(--duration-fast);
+	}
+
+	.chevron.open {
+		transform: rotate(45deg); /* points down: expanded */
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.chevron {
+			transition: none;
+		}
 	}
 
 	.actions {

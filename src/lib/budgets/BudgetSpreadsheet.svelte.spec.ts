@@ -1,5 +1,5 @@
 import { page, userEvent } from 'vitest/browser';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
 import '../styles/base.css';
@@ -452,7 +452,7 @@ describe('adding Items', () => {
 		editor(nested());
 		const headers = [...document.querySelectorAll('thead th')].map((th) => th.textContent?.trim());
 		expect(headers).toEqual(['Code', 'Description', 'Quantity', 'Unit', 'Unit price', 'Total', 'Actions']);
-		expect(document.querySelectorAll('tbody button')).toHaveLength(15); // Add below, Add child and Delete on each of the 5 rows
+		expect(document.querySelectorAll('tbody button')).toHaveLength(17); // Add below, Add child and Delete on each of the 5 rows, plus a toggle on each of the 2 Groups
 	});
 });
 
@@ -807,5 +807,186 @@ describe('money display in the Budget currency', () => {
 		expect(cell.hasAttribute('data-readonly')).toBe(true);
 		expect(cell.querySelector('input, select, textarea, button')).toBeNull();
 		expect(cell.textContent?.trim()).toBe('$1,200.25');
+	});
+});
+
+describe('collapsing groups', () => {
+	/**
+	 * 1 Item 1 (group, x2)
+	 *   1.1 Item 2 (group, x3)
+	 *     1.1.1 Item 3  10
+	 *     1.1.2 Item 4  5 x2
+	 *   1.2 Item 5  7
+	 * 2 Item 6  100      (grand total: 2 x (3 x 20 + 7) + 100 = 234)
+	 */
+	const tree = () => [...nested(), item(6, null, '100')];
+
+	function editor(items: Item[] = tree()) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const shownCodes = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-code'));
+	const toggle = (code: string) => page.getByRole('button', { name: new RegExp(`^(Collapse|Expand) ${code.replaceAll('.', '\\.')}$`) });
+	const grandTotal = () => page.getByLabelText('Grand total');
+
+	it('puts a toggle on every Group and none on Lines, starting expanded', async () => {
+		editor();
+		for (const code of ['1', '1.1']) {
+			await expect.element(page.getByRole('button', { name: `Collapse ${code}`, exact: true })).toHaveAttribute('aria-expanded', 'true');
+		}
+		expect(document.querySelectorAll('button.toggle')).toHaveLength(2);
+		expect(document.querySelector('[aria-label="Collapse 1.1.1"]')).toBeNull(); // a Line
+		expect(shownCodes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']);
+	});
+
+	it('collapses and expands a nested Group, hiding just its descendants', async () => {
+		editor();
+		await page.getByRole('button', { name: 'Collapse 1.1', exact: true }).click();
+		expect(shownCodes()).toEqual(['1', '1.1', '1.2', '2']);
+		await expect.element(page.getByRole('button', { name: 'Expand 1.1', exact: true })).toHaveAttribute('aria-expanded', 'false');
+
+		await page.getByRole('button', { name: 'Expand 1.1', exact: true }).click();
+		expect(shownCodes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']);
+	});
+
+	it('hides everything below a collapsed top-level Group, and remembers an inner collapsed Group on expand', async () => {
+		editor();
+		await page.getByRole('button', { name: 'Collapse 1.1', exact: true }).click();
+		await page.getByRole('button', { name: 'Collapse 1', exact: true }).click();
+		expect(shownCodes()).toEqual(['1', '2']);
+
+		await page.getByRole('button', { name: 'Expand 1', exact: true }).click();
+		expect(shownCodes()).toEqual(['1', '1.1', '1.2', '2']); // 1.1 is still collapsed
+
+		await page.getByRole('button', { name: 'Expand 1.1', exact: true }).click();
+		expect(shownCodes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']);
+	});
+
+	it('collapses all Groups at every depth, and expands them all again', async () => {
+		editor();
+		await page.getByRole('button', { name: 'Collapse all' }).click();
+		expect(shownCodes()).toEqual(['1', '2']);
+		await expect.element(page.getByRole('button', { name: 'Expand 1', exact: true })).toBeVisible();
+
+		await page.getByRole('button', { name: 'Expand all' }).click();
+		expect(shownCodes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']);
+		await expect.element(page.getByRole('button', { name: 'Collapse 1.1', exact: true })).toBeVisible();
+	});
+
+	it('disables the all-Group actions when they would do nothing, and shows none without Groups', async () => {
+		editor();
+		await expect.element(page.getByRole('button', { name: 'Expand all' })).toBeDisabled(); // nothing collapsed
+		await expect.element(page.getByRole('button', { name: 'Collapse all' })).toBeEnabled();
+		await page.getByRole('button', { name: 'Collapse all' }).click();
+		await expect.element(page.getByRole('button', { name: 'Collapse all' })).toBeDisabled(); // all collapsed
+		await expect.element(page.getByRole('button', { name: 'Expand all' })).toBeEnabled();
+	});
+
+	it('offers no collapse controls when the Budget has no Groups', async () => {
+		editor([item(1, null, '5'), item(2, null, '6')]);
+		expect(document.querySelector('[aria-label="Groups"]')).toBeNull();
+		expect(document.querySelectorAll('button.toggle')).toHaveLength(0);
+	});
+
+	it('still counts hidden Items in every total, and keeps the Codes of what stays visible', async () => {
+		editor();
+		await expect.element(grandTotal()).toHaveTextContent('€234.00');
+		const before = table();
+
+		await page.getByRole('button', { name: 'Collapse all' }).click();
+
+		await expect.element(grandTotal()).toHaveTextContent('€234.00'); // unchanged
+		expect(table()).toEqual([before[0], before[5]]); // the same Total for Group 1, the same Codes
+		expect(table()[0][5]).toBe('€134.00'); // Group 1's Total still includes its hidden descendants
+		expect(shownCodes()).toEqual(['1', '2']); // not renumbered
+	});
+
+	it('leaves the flat Items, history and storage alone', async () => {
+		const store = editor();
+		const items = store.items;
+		const setItem = vi.spyOn(Storage.prototype, 'setItem');
+
+		await page.getByRole('button', { name: 'Collapse 1.1', exact: true }).click();
+		await page.getByRole('button', { name: 'Collapse all' }).click();
+		await page.getByRole('button', { name: 'Expand all' }).click();
+
+		expect(store.items).toBe(items); // the very same array
+		expect(store.canUndo(BUDGET)).toBe(false); // no undo entry
+		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+		expect(setItem).not.toHaveBeenCalled(); // nothing written
+	});
+
+	it('does not disturb existing undo history', async () => {
+		const store = editor();
+		await page.getByLabelText('Quantity 2', { exact: true }).fill('3'); // an Item edit: one command
+		await userEvent.keyboard('{Enter}');
+		expect(store.canUndo(BUDGET)).toBe(true);
+
+		await page.getByRole('button', { name: 'Collapse all' }).click();
+		await page.getByRole('button', { name: 'Expand all' }).click();
+
+		expect(store.canUndo(BUDGET)).toBe(true);
+		store.undo(BUDGET);
+		expect(store.canUndo(BUDGET)).toBe(false); // exactly one command, as before
+	});
+
+	it('keeps totals live while Items are hidden: an edit, then undo, updates them', async () => {
+		const store = editor();
+		await page.getByRole('button', { name: 'Collapse 1', exact: true }).click();
+		expect(shownCodes()).toEqual(['1', '2']);
+
+		store.editItem(BUDGET, uuid(3), 'unitPrice', '20'); // a hidden Line: Item 3 10 -> 20
+		await expect.element(grandTotal()).toHaveTextContent('€294.00'); // 2 x (3 x 30 + 7) + 100
+		store.undo(BUDGET);
+		await expect.element(grandTotal()).toHaveTextContent('€234.00');
+		expect(shownCodes()).toEqual(['1', '2']); // still collapsed
+	});
+
+	it('is not remembered: a fresh editor starts fully expanded', async () => {
+		const store = openStore(tree());
+		const first = render(BudgetEditorPage, { budgetId: BUDGET, store });
+		await page.getByRole('button', { name: 'Collapse all' }).click();
+		expect(shownCodes()).toEqual(['1', '2']);
+		first.unmount();
+
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		await expect.element(page.getByRole('button', { name: 'Collapse 1', exact: true })).toBeVisible();
+		expect(shownCodes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']);
+	});
+
+	it('opens a collapsed Group when a child is added to it, so the new row is visible and focused', async () => {
+		const store = editor();
+		await page.getByRole('button', { name: 'Collapse 1.1', exact: true }).click();
+		expect(shownCodes()).toEqual(['1', '1.1', '1.2', '2']);
+
+		await page.getByRole('button', { name: 'Add child to 1.1', exact: true }).click();
+
+		expect(shownCodes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.1.3', '1.2', '2']);
+		await expect.element(page.getByLabelText('Description 1.1.3', { exact: true })).toHaveFocus();
+		expect(store.itemsOf(BUDGET)).toHaveLength(7);
+	});
+
+	it('can still delete a collapsed Group, with the confirmation naming everything hidden inside it', async () => {
+		editor();
+		await page.getByRole('button', { name: 'Collapse 1', exact: true }).click();
+		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
+		await expect.element(page.getByRole('dialog', { name: 'Delete “Item 1”?' })).toHaveAccessibleDescription(
+			'This removes the group and 4 items inside it. You can undo this.'
+		);
+	});
+
+	it('works from the keyboard like any button', async () => {
+		editor();
+		page.getByRole('button', { name: 'Collapse 1.1', exact: true }).element().focus();
+		await userEvent.keyboard('{Enter}');
+		expect(shownCodes()).toEqual(['1', '1.1', '1.2', '2']);
+		await userEvent.keyboard(' ');
+		expect(shownCodes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']);
+	});
+
+	it('shows no toggles in a read-only table', async () => {
+		render(BudgetSpreadsheet, { rows: openStore(tree()).rows, currency: 'EUR' });
+		expect(document.querySelectorAll('button.toggle')).toHaveLength(0);
 	});
 });

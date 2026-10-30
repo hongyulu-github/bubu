@@ -550,3 +550,34 @@ describe('Everything is saved automatically (built static site)', () => {
 		expect(await page.getByLabel('Description 2', { exact: true }).inputValue()).toBe('Unsaved');
 	});
 });
+
+describe('Collapsing groups (built static site)', () => {
+	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
+	const codes = () => page.locator('tbody tr').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-code')));
+
+	it('hides and shows descendants without changing totals, history or what is saved', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('button', { name: 'Collapse 1', exact: true }).waitFor();
+		const storedBefore = await page.evaluate(() => JSON.stringify({ ...localStorage }));
+		const totalBefore = await total();
+		expect(await codes()).toEqual(['1', '1.1', '2']);
+
+		await page.getByRole('button', { name: 'Collapse 1', exact: true }).click();
+		expect(await codes()).toEqual(['1', '2']);
+		expect(await total()).toBe(totalBefore);
+		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(true);
+		await page.getByRole('button', { name: 'Expand all' }).click();
+		expect(await codes()).toEqual(['1', '1.1', '2']);
+
+		expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).toBe(storedBefore); // nothing written
+	});
+
+	it('forgets which Groups were collapsed after a reload', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('button', { name: 'Collapse all' }).click();
+		expect(await codes()).toEqual(['1', '2']);
+		await page.reload();
+		await page.getByRole('button', { name: 'Collapse 1', exact: true }).waitFor();
+		expect(await codes()).toEqual(['1', '1.1', '2']);
+	});
+});

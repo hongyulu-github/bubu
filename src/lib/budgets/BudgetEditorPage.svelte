@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { collapseAll, expandAll, toggleCollapsed, visibleRows } from '../budget/collapse';
 	import { describeConversion, type ConversionImpact } from '../budget/convert';
 	import { describeDeletion, type DeletionImpact } from '../budget/delete';
 	import { formatMoney } from '../budget/currency';
@@ -64,6 +65,8 @@
 	}
 
 	async function addChildNow(parentId: string) {
+		// A new child must not land in a hidden row: open the Group it is added to.
+		if (collapsed.has(parentId)) collapsed = toggleCollapsed(collapsed, parentId);
 		const added = store.addChildItem(budgetId, parentId);
 		if (added.ok) await focusDescription(added.item.id);
 	}
@@ -95,6 +98,14 @@
 		if (added.ok) await focusDescription(added.item.id);
 	}
 	const rows = $derived(ready ? store.rows : []);
+
+	// Which Groups are collapsed is editor UI state: not in the store, not in history, not saved. The
+	// rows shown are derived from it; totals and Codes always come from all the Items.
+	let collapsed = $state.raw<ReadonlySet<string>>(new Set());
+	const shownRows = $derived(visibleRows(rows, collapsed));
+	const groupIds = $derived(rows.filter((row) => row.kind === 'group').map((row) => row.id));
+	const allCollapsed = $derived(groupIds.length > 0 && groupIds.every((id) => collapsed.has(id)));
+	const noneCollapsed = $derived(!groupIds.some((id) => collapsed.has(id)));
 </script>
 
 <main>
@@ -126,9 +137,17 @@
 		<ConfirmDeleteDialog impact={pendingDelete} bind:open={confirmingDelete} onconfirm={confirmDelete} />
 
 		{#if ready}
-			<div class="history" role="group" aria-label="History">
-				<Button disabled={!store.canUndo(budgetId)} onclick={() => store.undo(budgetId)}>Undo</Button>
-				<Button disabled={!store.canRedo(budgetId)} onclick={() => store.redo(budgetId)}>Redo</Button>
+			<div class="toolbar">
+				<div class="history" role="group" aria-label="History">
+					<Button disabled={!store.canUndo(budgetId)} onclick={() => store.undo(budgetId)}>Undo</Button>
+					<Button disabled={!store.canRedo(budgetId)} onclick={() => store.redo(budgetId)}>Redo</Button>
+				</div>
+				{#if groupIds.length > 0}
+					<div class="history" role="group" aria-label="Groups">
+						<Button disabled={allCollapsed} onclick={() => (collapsed = collapseAll(rows))}>Collapse all</Button>
+						<Button disabled={noneCollapsed} onclick={() => (collapsed = expandAll())}>Expand all</Button>
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -136,8 +155,10 @@
 			<p class="note">This Budget has no Items yet.</p>
 		{:else if rows.length > 0}
 			<BudgetSpreadsheet
-				{rows}
+				rows={shownRows}
 				currency={budget.currency}
+				{collapsed}
+				ontoggle={(groupId) => (collapsed = toggleCollapsed(collapsed, groupId))}
 				onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
 				onadd={addBelow}
 				ondelete={requestDelete}
@@ -213,6 +234,12 @@
 	.add {
 		display: flex;
 		margin-top: var(--space-2);
+	}
+
+	.toolbar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-4);
 	}
 
 	.history {
