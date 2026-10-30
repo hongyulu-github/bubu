@@ -99,6 +99,8 @@ export class BudgetStore {
 	activeBudgetId = $state<Uuid | null>(null);
 
 	hydrationStatus = $state<HydrationStatus>('idle');
+	/** Increments on every `hydrate()`, so the autosave path knows when the loaded baseline was replaced. */
+	hydrationCount = $state(0);
 	loadIssues = $state.raw<readonly LoadIssue[]>([]);
 	#historyVersion = $state(0);
 
@@ -136,6 +138,7 @@ export class BudgetStore {
 		if (!listing.ok) {
 			this.hydrationStatus = 'unavailable';
 			this.loadIssues = [{ error: listing.error }];
+			this.hydrationCount++;
 			return;
 		}
 
@@ -160,6 +163,7 @@ export class BudgetStore {
 		this.#itemsByBudget = itemsByBudget;
 		this.loadIssues = issues;
 		this.hydrationStatus = 'ready';
+		this.hydrationCount++;
 		if (this.activeBudgetId !== null && !itemsByBudget[this.activeBudgetId]) this.activeBudgetId = null;
 	}
 

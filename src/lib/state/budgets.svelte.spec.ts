@@ -621,10 +621,6 @@ describe('deleteBudget', () => {
 		store.deleteBudget(A);
 		expect(JSON.stringify({ ...localStorage })).toBe(snapshot);
 	});
-
-	// Needs the autosave path from LUL-54, which does not exist yet: today a deleted Budget returns on reload
-	// because nothing removes it from storage. Turn this into a real test once autosave is wired.
-	it.todo('a deleted Budget does not return after a reload once autosave is wired (LUL-54)');
 });
 
 describe('addChildItem', () => {

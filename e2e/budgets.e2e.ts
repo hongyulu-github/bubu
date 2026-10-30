@@ -416,3 +416,137 @@ describe('Deleting a Budget (built static site)', () => {
 		expect(await items()).toEqual(['1 Paint', '2 Flooring']);
 	});
 });
+
+describe('Everything is saved automatically (built static site)', () => {
+	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
+	const editorItems = () => items();
+
+	it('keeps a Budget you build from scratch after a reload', async () => {
+		await page.goto(`${baseUrl}/budgets/new`);
+		await page.getByLabel('Name').fill('Saved from scratch');
+		await page.getByLabel('Currency').selectOption('DKK');
+		await page.getByRole('button', { name: 'Create Budget' }).click();
+		await page.getByText('This Budget has no Items yet.').waitFor();
+
+		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByLabel('Description 1', { exact: true }).fill('Venue');
+		await page.keyboard.press('Enter');
+		await page.getByLabel('Unit price 1', { exact: true }).fill('-250.50');
+		await page.keyboard.press('Enter');
+		await page.getByLabel('Quantity 1', { exact: true }).fill('0.125');
+		await page.keyboard.press('Enter');
+		await page.getByRole('button', { name: 'Add child to 1', exact: true }).click();
+		await page.getByRole('button', { name: 'Convert and add item' }).click();
+		await page.getByLabel('Description 1.1', { exact: true }).fill('Hall');
+		await page.keyboard.press('Enter');
+		const url = page.url();
+
+		await page.reload();
+		await page.getByRole('heading', { name: 'Saved from scratch' }).waitFor();
+		expect(page.url()).toBe(url);
+		expect(await page.locator('main').innerText()).toContain('DKK');
+		expect(await editorItems()).toEqual(['1 Venue', '1.1 Hall']);
+		expect(await page.getByLabel('Quantity 1', { exact: true }).inputValue()).toBe('0.125'); // precision kept
+		expect(await page.getByLabel('Unit price 1.1', { exact: true }).inputValue()).toBe('0');
+		// The Line-to-Group conversion was saved: Venue is a calculated Group with no price input.
+		expect(await page.getByLabel('Unit price 1', { exact: true }).count()).toBe(0);
+	});
+
+	it('keeps a rename, a duplicate and an edit to a seeded Budget after a reload', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('button', { name: 'Rename' }).click();
+		await page.getByLabel('Name', { exact: true }).fill('Renamed');
+		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByLabel('Description 2', { exact: true }).fill('Changed');
+		await page.keyboard.press('Enter');
+
+		await page.getByRole('link', { name: /All Budgets/ }).click();
+		await page.getByRole('button', { name: 'Duplicate Renamed' }).click();
+		await page.getByRole('link', { name: /Renamed \(copy\)/ }).waitFor();
+
+		await page.reload();
+		await page.getByRole('link', { name: /Renamed \(copy\)/ }).waitFor();
+		expect(await page.locator('main ul li').count()).toBe(3);
+		await page.getByRole('link', { name: /^Renamed EUR/ }).click();
+		await page.getByRole('heading', { name: 'Renamed', exact: true }).waitFor();
+		expect(await editorItems()).toEqual(['1 Venue', '1.1 Hall rental', '2 Changed']);
+	});
+
+	it('does not bring a deleted Budget back after a reload', async () => {
+		await page.goto(`${baseUrl}/budgets`);
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
+		await expect.poll(() => page.locator('main ul li').count()).toBe(1);
+
+		await page.reload();
+		await page.getByRole('link', { name: /Renovation/ }).waitFor();
+		expect(await page.locator('main ul li').count()).toBe(1);
+		expect(await page.getByRole('link', { name: /Wedding/ }).count()).toBe(0);
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('heading', { name: 'Budget not found' }).waitFor();
+	});
+
+	it('saves what an undo leaves, but never the history itself', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByLabel('Unit price 2', { exact: true }).waitFor();
+		await page.getByLabel('Unit price 2', { exact: true }).fill('99');
+		await page.keyboard.press('Enter');
+		await expect.poll(total).toBe('99 EUR');
+		await page.reload();
+		await page.getByLabel('Unit price 2', { exact: true }).waitFor();
+		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('99');
+
+		// History starts empty after a reload, so there is nothing to undo...
+		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(true);
+
+		// ...but an undo made in this session is saved like any other change.
+		await page.getByLabel('Unit price 2', { exact: true }).fill('5');
+		await page.keyboard.press('Enter');
+		await page.getByRole('button', { name: 'Undo' }).click();
+		await expect.poll(total).toBe('99 EUR');
+		await page.reload();
+		await page.getByLabel('Unit price 2', { exact: true }).waitFor();
+		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('99');
+
+		const keys = await page.evaluate(() => Object.keys(localStorage).sort());
+		expect(keys.every((key) => /^bubu:(budget|items):/.test(key))).toBe(true);
+	});
+
+	it('leaves an abandoned edit unsaved', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByLabel('Description 2', { exact: true }).fill('Never committed');
+		await page.keyboard.press('Escape');
+		await page.reload();
+		await page.getByLabel('Description 2', { exact: true }).waitFor();
+		expect(await page.getByLabel('Description 2', { exact: true }).inputValue()).toBe('Music');
+	});
+
+	it('shows an alert when saving fails, keeps the work on screen, and recovers on retry', async () => {
+		await page.addInitScript(() => {
+			const original = Storage.prototype.setItem;
+			Storage.prototype.setItem = function (key: string, value: string) {
+				if ((window as unknown as { __failWrites?: boolean }).__failWrites) {
+					throw new DOMException('full', 'QuotaExceededError');
+				}
+				return original.call(this, key, value);
+			};
+		});
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByLabel('Description 2', { exact: true }).waitFor();
+		await page.evaluate(() => ((window as unknown as { __failWrites: boolean }).__failWrites = true));
+
+		await page.getByLabel('Description 2', { exact: true }).fill('Unsaved');
+		await page.keyboard.press('Enter');
+		await page.getByRole('alert').waitFor();
+		expect(await page.getByRole('alert').innerText()).toContain('Your changes are not being saved');
+		expect(await page.getByLabel('Description 2', { exact: true }).inputValue()).toBe('Unsaved'); // still there
+
+		await page.evaluate(() => ((window as unknown as { __failWrites: boolean }).__failWrites = false));
+		await page.getByRole('button', { name: 'Try again' }).click();
+		await expect.poll(() => page.getByRole('alert').count()).toBe(0);
+		await page.reload();
+		await page.getByLabel('Description 2', { exact: true }).waitFor();
+		expect(await page.getByLabel('Description 2', { exact: true }).inputValue()).toBe('Unsaved');
+	});
+});
