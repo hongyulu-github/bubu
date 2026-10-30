@@ -35,3 +35,6 @@ Thumbs.db
 # Temp directories
 .temp
 .tmp
+
+# Installed agent skills (reinstall from skills-lock.json; third-party content)
+.agents/
