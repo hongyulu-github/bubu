@@ -128,6 +128,53 @@ describe('Budgets list and editor routes (built static site)', () => {
 		await page.evaluate(() => localStorage.clear());
 		await page.goto(`${baseUrl}/budgets`);
 		await page.getByText('No saved Budgets yet.').waitFor();
-		expect(await page.getByRole('link').count()).toBe(0);
+		expect(await page.getByRole('list').count()).toBe(0);
+		expect(await page.getByRole('link', { name: 'New Budget' }).count()).toBe(1);
+	});
+});
+
+describe('Creating a Budget (built static site)', () => {
+	it('creates an empty Budget from the list and opens its editor', async () => {
+		await page.goto(`${baseUrl}/budgets`);
+		await page.getByRole('link', { name: 'New Budget' }).click();
+		await page.getByRole('heading', { name: 'New Budget' }).waitFor();
+		expect(page.url()).toBe(`${baseUrl}/budgets/new`);
+
+		await page.getByLabel('Name').fill('  Summer trip  ');
+		await page.getByLabel('Currency').selectOption('DKK');
+		await page.getByRole('button', { name: 'Create Budget' }).click();
+
+		await page.getByRole('heading', { name: 'Summer trip' }).waitFor();
+		expect(page.url()).toMatch(new RegExp(`^${baseUrl}/budgets/[0-9a-f-]{36}$`));
+		expect(await page.locator('main').innerText()).toContain('DKK');
+		await page.getByText('This Budget has no Items yet.').waitFor();
+		expect(await page.locator('ol[aria-label="Items"]').count()).toBe(0);
+
+		// The new Budget is in shared state, so the list shows it next to the saved ones.
+		await page.getByRole('link', { name: /All Budgets/ }).click();
+		await page.getByRole('link', { name: /Summer trip/ }).waitFor();
+		expect(await page.getByRole('link', { name: /Summer trip/ }).innerText()).toContain('DKK');
+		expect(await page.getByRole('link', { name: /Wedding/ }).count()).toBe(1);
+	});
+
+	it('shows validation errors and stays on the form when the input is invalid', async () => {
+		await page.goto(`${baseUrl}/budgets/new`);
+		await page.getByLabel('Name').fill('   ');
+		await page.getByRole('button', { name: 'Create Budget' }).click();
+
+		await page.getByText('Enter a name for the Budget.').waitFor();
+		await page.getByText('Choose a currency.').waitFor();
+		expect(page.url()).toBe(`${baseUrl}/budgets/new`);
+
+		await page.getByLabel('Name').fill('Fixed');
+		await page.getByLabel('Currency').selectOption('EUR');
+		await page.getByRole('button', { name: 'Create Budget' }).click();
+		await page.getByRole('heading', { name: 'Fixed' }).waitFor();
+	});
+
+	it('opens the create form directly (served by the prerendered page)', async () => {
+		await page.goto(`${baseUrl}/budgets/new`);
+		await page.getByRole('heading', { name: 'New Budget' }).waitFor();
+		expect(await page.getByLabel('Currency').inputValue()).toBe('');
 	});
 });

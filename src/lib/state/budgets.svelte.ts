@@ -1,4 +1,5 @@
 import { calculateTotals, type ItemAmounts } from '../budget/calculate';
+import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
 import type { Budget, Item, ItemKind, Uuid } from '../budget/model';
 import { buildItemTree } from '../budget/tree';
 import { validateBudget, validateItems, type ValidationIssue } from '../budget/validation';
@@ -148,6 +149,18 @@ export class BudgetStore {
 		if (items) this.#itemsByBudget = { ...this.#itemsByBudget, [budget.id]: items };
 		else if (!exists) this.#itemsByBudget = { ...this.#itemsByBudget, [budget.id]: [] };
 		return { ok: true };
+	}
+
+	/**
+	 * Create a normal Budget from the create form: validated, a fresh UUID and timestamps, and an
+	 * empty Item array (never template data). The Budget is added to shared state; it is not selected,
+	 * so the caller decides where to navigate. Not an undoable command.
+	 */
+	createBudget(input: BudgetFormInput, options?: { id?: Uuid; now?: Date }): CreateBudgetResult {
+		const created = createBudgetDocument(input, { now: this.#now(), ...options });
+		if (!created.ok) return created;
+		this.setBudget(created.budget, []);
+		return created;
 	}
 
 	/** Remove a Budget from state (its history stays in memory until the page reloads). */

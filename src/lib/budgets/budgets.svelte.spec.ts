@@ -49,7 +49,7 @@ describe('BudgetsList', () => {
 		seed();
 		render(BudgetsList, { store: newStore() });
 
-		const links = page.getByRole('link');
+		const links = page.getByRole('list').getByRole('link');
 		await expect.element(links.nth(0)).toHaveTextContent('Renovation');
 		await expect.element(links.nth(0)).toHaveTextContent('USD');
 		await expect.element(links.nth(1)).toHaveTextContent('Wedding');
@@ -62,6 +62,11 @@ describe('BudgetsList', () => {
 		render(BudgetsList, { store: newStore() });
 		await expect.element(page.getByRole('link', { name: /Wedding/ })).toHaveAttribute('href', `/budgets/${A}`);
 		await expect.element(page.getByRole('link', { name: /Renovation/ })).toHaveAttribute('href', `/budgets/${B}`);
+	});
+
+	it('offers a New Budget link to the create form', async () => {
+		render(BudgetsList, { store: newStore() });
+		await expect.element(page.getByRole('link', { name: 'New Budget' })).toHaveAttribute('href', '/budgets/new');
 	});
 
 	it('shows a loading state before hydration and an empty state with no Budgets', async () => {

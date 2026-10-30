@@ -319,6 +319,49 @@ describe('history and Budget switching', () => {
 	});
 });
 
+describe('createBudget', () => {
+	it('adds one root Budget with no Items and a zero grand total, without selecting it', () => {
+		const store = newStore();
+		const result = store.createBudget({ name: '  Wedding ', currency: 'EUR' });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(store.budgets).toEqual([result.budget]);
+		expect(result.budget).toMatchObject({ name: 'Wedding', currency: 'EUR' });
+		expect(result.budget.createdAt).toBe('2026-05-06T07:08:09.000Z'); // the store's clock
+		expect(store.itemsOf(result.budget.id)).toEqual([]);
+		expect(store.activeBudgetId).toBeNull();
+
+		store.select(result.budget.id);
+		expect(store.rows).toEqual([]);
+		expect(toString(store.grandTotal)).toBe('0');
+		expect(store.canUndo(result.budget.id)).toBe(false);
+	});
+
+	it('rejects invalid input and changes nothing', () => {
+		const store = newStore();
+		expect(store.createBudget({ name: '   ', currency: 'EUR' })).toEqual({
+			ok: false,
+			errors: { name: 'Enter a name for the Budget.' }
+		});
+		expect(store.createBudget({ name: 'x', currency: '' })).toMatchObject({ ok: false });
+		expect(store.budgets).toEqual([]);
+	});
+
+	it('creates independent Budgets that do not share Items or history', () => {
+		const store = newStore();
+		const first = store.createBudget({ name: 'One', currency: 'EUR' });
+		const second = store.createBudget({ name: 'Two', currency: 'USD' });
+		if (!first.ok || !second.ok) throw new Error('creation failed');
+		expect(first.budget.id).not.toBe(second.budget.id);
+
+		store.execute(first.budget.id, [item(first.budget.id, 1, null, '5')]);
+		expect(store.itemsOf(second.budget.id)).toEqual([]);
+		expect(store.canUndo(first.budget.id)).toBe(true);
+		expect(store.canUndo(second.budget.id)).toBe(false);
+	});
+});
+
 describe('Budget documents', () => {
 	it('adds, replaces and removes Budgets in shared state', () => {
 		const store = newStore();

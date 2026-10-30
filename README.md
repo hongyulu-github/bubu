@@ -30,7 +30,7 @@ Layout: application code in `src/lib` (import via `#lib`), static routes in `src
 
 Tests: `*.spec.ts` run in Node; `*.svelte.spec.ts` run in a real browser via `vitest-browser-svelte` (see `src/lib/smoke`); `e2e/*.e2e.ts` drive the built static site in Chromium with Playwright.
 
-Routes: `/budgets` lists saved Budgets and `/budgets/<uuid>` opens one. Budget URLs depend on browser-local data, so they are not prerendered: the build emits an SPA fallback (`200.html`) and **the host must serve `/200.html` for any URL it has no file for** (a rewrite; configure this when deploying).
+Routes: `/budgets` lists saved Budgets, `/budgets/new` creates an empty one, and `/budgets/<uuid>` opens one. Budget URLs depend on browser-local data, so they are not prerendered: the build emits an SPA fallback (`200.html`) and **the host must serve `/200.html` for any URL it has no file for** (a rewrite; configure this when deploying).
 
 Design tokens and base components (`Button`, `Input`, `NumberInput`, `Dialog`, `TableCell`) are documented in [docs/design-foundation.md](docs/design-foundation.md), including source and license. Run `npm run dev` and open `/design` for a live preview.
 

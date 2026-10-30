@@ -14,7 +14,10 @@
 </script>
 
 <main>
-	<h1>Your Budgets</h1>
+	<header>
+		<h1>Your Budgets</h1>
+		<a class="new" href="/budgets/new">New Budget</a>
+	</header>
 
 	{#if store.hydrationStatus === 'idle'}
 		<p class="note" role="status">Loading your Budgets…</p>
@@ -55,10 +58,34 @@
 		gap: var(--space-4);
 	}
 
+	header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-4);
+	}
+
 	h1 {
 		margin: 0;
 		font-size: var(--font-size-display);
 		line-height: var(--line-height-tight);
+	}
+
+	.new {
+		display: inline-flex;
+		align-items: center;
+		min-height: var(--control-height);
+		padding: 0 var(--space-5);
+		border-radius: var(--radius-md);
+		background: var(--color-accent);
+		color: var(--color-on-accent);
+		font-weight: var(--font-weight-medium);
+		text-decoration: none;
+	}
+
+	.new:focus-visible {
+		outline: var(--focus-ring-width) solid var(--color-focus-ring);
+		outline-offset: var(--focus-ring-offset);
 	}
 
 	ul {
@@ -70,7 +97,7 @@
 		gap: var(--space-3);
 	}
 
-	a {
+	ul a {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -84,11 +111,11 @@
 		text-decoration: none;
 	}
 
-	a:hover {
+	ul a:hover {
 		border-color: var(--color-border-strong);
 	}
 
-	a:focus-visible {
+	ul a:focus-visible {
 		outline: var(--focus-ring-width) solid var(--color-focus-ring);
 		outline-offset: var(--focus-ring-offset);
 	}
