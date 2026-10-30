@@ -12,6 +12,8 @@ export interface Decimal {
 	readonly scale: number;
 }
 
+export const ZERO: Decimal = { coefficient: 0n, scale: 0 };
+
 export type ParseError = 'blank' | 'not-a-number' | 'negative-quantity';
 
 export type ParseResult = { ok: true; value: Decimal } | { ok: false; error: ParseError };
@@ -64,6 +66,13 @@ export function add(a: Decimal, b: Decimal): Decimal {
 
 export function multiply(a: Decimal, b: Decimal): Decimal {
 	return { coefficient: a.coefficient * b.coefficient, scale: a.scale + b.scale };
+}
+
+/** Exact sum of any number of values; zero for an empty list. */
+export function sum(values: Iterable<Decimal>): Decimal {
+	let total = ZERO;
+	for (const value of values) total = add(total, value);
+	return total;
 }
 
 /** Numeric comparison: -1, 0 or 1. Scale does not matter ("1.0" equals "1"). */

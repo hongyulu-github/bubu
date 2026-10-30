@@ -10,7 +10,9 @@ import {
 	parseDecimal,
 	parseQuantity,
 	parseUnitPrice,
+	sum,
 	toString,
+	ZERO,
 	type Decimal
 } from './numbers';
 
@@ -192,5 +194,14 @@ describe('serialization', () => {
 	it('throws when reading stored data that is not a decimal', () => {
 		expect(() => fromString('abc')).toThrow(/Invalid decimal/);
 		expect(() => fromString('')).toThrow(/blank/);
+	});
+});
+
+describe('ZERO and sum', () => {
+	it('sums exactly and returns zero for no values', () => {
+		expect(toString(sum([]))).toBe('0');
+		expect(toString(sum([dec('0.1'), dec('0.2'), dec('-0.3')]))).toBe('0.0');
+		expect(isZero(sum([dec('0.1'), dec('0.2'), dec('-0.3')]))).toBe(true);
+		expect(toString(ZERO)).toBe('0');
 	});
 });
