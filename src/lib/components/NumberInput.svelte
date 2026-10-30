@@ -14,6 +14,8 @@
 		error?: string;
 		hideLabel?: boolean;
 		compact?: boolean;
+		/** Pass -1 to take the field out of the Tab order (e.g. a cell in a grid that has its own tab stop). */
+		tabindex?: number;
 		/** Fires on every keystroke with the current text. */
 		oninput?: (text: string) => void;
 		/** Fires when the user commits the field (blur or Enter), with the text and how it parsed. */
@@ -29,6 +31,7 @@
 		error,
 		hideLabel = false,
 		compact = false,
+		tabindex,
 		oninput,
 		onchange
 	}: Props = $props();
@@ -48,6 +51,7 @@
 	{hideLabel}
 	{compact}
 	numeric
+	{tabindex}
 	error={message}
 	bind:value
 	type="text"

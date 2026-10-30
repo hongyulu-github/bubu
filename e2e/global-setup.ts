@@ -30,7 +30,13 @@ function fileFor(pathname: string): string | null {
 
 /** Build the static site, then serve `build/` the way production hosting will (clean URLs + SPA fallback). */
 export default async function setup(project: TestProject) {
-	execFileSync('npm', ['run', 'build'], { stdio: 'ignore' });
+	try {
+		execFileSync('npm', ['run', 'build'], { stdio: 'pipe' });
+	} catch (error) {
+		// Show the build's own output: a bare "Command failed" says nothing about why.
+		const output = error as { stdout?: Buffer; stderr?: Buffer };
+		throw new Error(`The site failed to build for the e2e tests:\n${output.stdout ?? ''}\n${output.stderr ?? ''}`);
+	}
 
 	const server: Server = createServer((request, response) => {
 		const file = fileFor(new URL(request.url ?? '/', 'http://localhost').pathname);

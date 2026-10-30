@@ -71,7 +71,7 @@ describe('BudgetSpreadsheet', () => {
 
 	it('shows nested Quantity multipliers: each Group multiplies after summing its direct children', async () => {
 		render(BudgetSpreadsheet, { rows: openStore(nested()).rows, currency: 'EUR' });
-		await expect.element(page.getByRole('table', { name: 'Budget Items' })).toBeVisible();
+		await expect.element(page.getByRole('grid', { name: 'Budget Items' })).toBeVisible();
 		expect(table()).toEqual([
 			['1', 'Item 1', '2', '', '€67.00', '€134.00'],
 			['1.1', 'Item 2', '3', '', '€20.00', '€60.00'],
@@ -378,7 +378,7 @@ describe('adding Items', () => {
 
 		await page.getByRole('button', { name: 'Add item', exact: true }).click();
 
-		await expect.element(page.getByRole('table', { name: 'Budget Items' })).toBeVisible();
+		await expect.element(page.getByRole('grid', { name: 'Budget Items' })).toBeVisible();
 		expect(codes()).toEqual(['1']);
 		expect(table()).toEqual([['1', '', '1', '', '0', '€0.00']]); // empty Description, Quantity 1, Unit price 0 (an input), Total 0
 		await expect.element(page.getByLabelText('Description 1', { exact: true })).toHaveFocus();
@@ -988,5 +988,501 @@ describe('collapsing groups', () => {
 	it('shows no toggles in a read-only table', async () => {
 		render(BudgetSpreadsheet, { rows: openStore(tree()).rows, currency: 'EUR' });
 		expect(document.querySelectorAll('button.toggle')).toHaveLength(0);
+	});
+});
+
+describe('keyboard navigation and editing', () => {
+	/**
+	 * 1 Item 1 (group, x2)            1.1 Item 2 (group, x3)
+	 *   1.1.1 Item 3 line 10            1.1.2 Item 4 line 5 x2
+	 *   1.2 Item 5 line 7
+	 * 2 Item 6 line 100
+	 */
+	const tree = () => [...nested(), item(6, null, '100')];
+
+	function editor(items: Item[] = tree()) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const cellEl = (code: string, column: string) =>
+		document.querySelector<HTMLElement>(`tr[data-code="${code}"] td[data-cell$="|${column}"]`)!;
+	/** Where focus is, as "code:column:mode" (mode is nav on a cell, edit inside its input), or null. */
+	const where = () => {
+		const el = document.activeElement as HTMLElement | null;
+		const td = el?.closest<HTMLElement>('[data-cell]');
+		if (!el || !td) return null;
+		return `${td.closest('tr')!.dataset.code}:${td.dataset.cell!.split('|')[1]}:${el.tagName === 'INPUT' ? 'edit' : 'nav'}`;
+	};
+	const press = (keys: string) => userEvent.keyboard(keys);
+	const focus = (code: string, column: string) => cellEl(code, column).focus();
+	const itemOf = (store: BudgetStore, n: number) => store.itemsOf(BUDGET).find((i) => i.id === uuid(n))!;
+
+	describe('the grid as one tab stop', () => {
+		it('has a single cell in the Tab order, and keeps the inputs out of it', async () => {
+			editor();
+			const stops = [...document.querySelectorAll('tbody td[data-cell]')].filter((td) => td.getAttribute('tabindex') === '0');
+			expect(stops).toHaveLength(1);
+			expect(stops[0]).toBe(cellEl('1', 'description')); // the first Description until a cell is active
+			expect([...document.querySelectorAll('tbody input')].every((input) => input.getAttribute('tabindex') === '-1')).toBe(true);
+		});
+
+		it('moves the tab stop to the active cell', async () => {
+			editor();
+			focus('1.2', 'quantity');
+			await expect.poll(() => cellEl('1.2', 'quantity').getAttribute('tabindex')).toBe('0');
+			expect(cellEl('1', 'description').getAttribute('tabindex')).toBe('-1');
+		});
+	});
+
+	describe('arrow keys (not editing)', () => {
+		it('move between cells, including the read-only ones', async () => {
+			editor();
+			focus('1.1.1', 'description');
+			await press('{ArrowRight}');
+			expect(where()).toBe('1.1.1:quantity:nav');
+			await press('{ArrowRight}{ArrowRight}');
+			expect(where()).toBe('1.1.1:unitPrice:nav');
+			await press('{ArrowRight}');
+			expect(where()).toBe('1.1.1:total:nav'); // read-only, but navigable
+			await press('{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}');
+			expect(where()).toBe('1.1.1:code:nav');
+		});
+
+		it('move up and down through the rows, keeping the column', async () => {
+			editor();
+			focus('1', 'quantity');
+			await press('{ArrowDown}');
+			expect(where()).toBe('1.1:quantity:nav');
+			await press('{ArrowDown}{ArrowDown}{ArrowDown}');
+			expect(where()).toBe('1.2:quantity:nav');
+			await press('{ArrowDown}');
+			expect(where()).toBe('2:quantity:nav');
+			await press('{ArrowUp}');
+			expect(where()).toBe('1.2:quantity:nav');
+		});
+
+		it('stop at the edges instead of wrapping', async () => {
+			editor();
+			focus('1', 'code');
+			await press('{ArrowUp}{ArrowLeft}');
+			expect(where()).toBe('1:code:nav');
+			focus('2', 'total');
+			await press('{ArrowDown}{ArrowRight}');
+			expect(where()).toBe('2:total:nav');
+		});
+
+		it('do not edit anything and do not scroll the page', async () => {
+			const store = editor();
+			const before = store.items;
+			focus('1.1.1', 'quantity');
+			const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+			cellEl('1.1.1', 'quantity').dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(true); // the page does not scroll
+			expect(store.items).toBe(before);
+			expect(store.canUndo(BUDGET)).toBe(false);
+		});
+
+		it('are ignored with a modifier key held', async () => {
+			editor();
+			focus('1.1.1', 'quantity');
+			await press('{Control>}{ArrowDown}{/Control}');
+			expect(where()).toBe('1.1.1:quantity:nav');
+		});
+	});
+
+	describe('Enter and F2 begin editing', () => {
+		it('Enter on an editable cell focuses its input with the text selected', async () => {
+			editor();
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			expect(where()).toBe('1.1.1:quantity:edit');
+			const input = document.activeElement as HTMLInputElement;
+			expect(input.selectionStart).toBe(0);
+			expect(input.selectionEnd).toBe(input.value.length);
+		});
+
+		it('F2 does the same', async () => {
+			editor();
+			focus('1.1.1', 'description');
+			await press('{F2}');
+			expect(where()).toBe('1.1.1:description:edit');
+		});
+
+		it('works on every editable cell: Description, Quantity, Unit, and a Line Unit price', async () => {
+			editor();
+			for (const column of ['description', 'quantity', 'unit', 'unitPrice']) {
+				focus('1.2', column);
+				await press('{Enter}');
+				expect(where(), column).toBe(`1.2:${column}:edit`);
+				await press('{Escape}');
+			}
+		});
+
+		it('never starts editing a read-only cell', async () => {
+			editor();
+			const readOnly: [string, string][] = [
+				['1.1.1', 'code'],
+				['1.1.1', 'total'],
+				['1', 'unitPrice'], // a Group's Unit price is calculated
+				['1.1', 'unitPrice'],
+				['1', 'total']
+			];
+			for (const [code, column] of readOnly) {
+				focus(code, column);
+				await press('{Enter}');
+				expect(where(), `${code} ${column} Enter`).toBe(`${code}:${column}:nav`);
+				await press('{F2}');
+				expect(where(), `${code} ${column} F2`).toBe(`${code}:${column}:nav`);
+				expect(cellEl(code, column).querySelector('input')).toBeNull();
+			}
+		});
+	});
+
+	describe('typing in an input is editing, not navigation', () => {
+		it('arrow keys move the caret and leave focus in the input', async () => {
+			editor();
+			focus('1.1.1', 'description');
+			await press('{Enter}');
+			await userEvent.keyboard('hello');
+			const input = document.activeElement as HTMLInputElement;
+			expect(input.value).toBe('hello');
+			await press('{ArrowLeft}{ArrowLeft}');
+			expect(where()).toBe('1.1.1:description:edit');
+			expect(input.selectionStart).toBe(3);
+			await press('{ArrowUp}{ArrowDown}{ArrowRight}');
+			expect(where()).toBe('1.1.1:description:edit');
+			expect(input.value).toBe('hello');
+		});
+
+		it('every printable key just types', async () => {
+			editor();
+			focus('1.1.1', 'unit');
+			await press('{Enter}');
+			await userEvent.keyboard('kg/m2 {Home}x');
+			expect((document.activeElement as HTMLInputElement).value).toBe('xkg/m2 ');
+			expect(where()).toBe('1.1.1:unit:edit');
+		});
+	});
+
+	describe('Enter while editing', () => {
+		it('commits and moves down to the cell below, ready to navigate', async () => {
+			const store = editor();
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('4{Enter}');
+			expect(itemOf(store, 3).quantity).toBe('4');
+			expect(where()).toBe('1.1.2:quantity:nav');
+			expect(store.canUndo(BUDGET)).toBe(true);
+		});
+
+		it('keeps going down column by column, and stays on the last row', async () => {
+			const store = editor();
+			focus('1.2', 'unit');
+			await press('{Enter}');
+			await userEvent.keyboard('a{Enter}');
+			expect(where()).toBe('2:unit:nav');
+			await press('{Enter}');
+			await userEvent.keyboard('b{Enter}');
+			expect(where()).toBe('2:unit:nav'); // the last row: nowhere further down
+			expect(itemOf(store, 5).unit).toBe('a');
+			expect(itemOf(store, 6).unit).toBe('b');
+		});
+
+		it('commits nothing and records nothing when the value is unchanged, but still moves', async () => {
+			const store = editor();
+			focus('1.1.1', 'quantity');
+			await press('{Enter}{Enter}');
+			expect(where()).toBe('1.1.2:quantity:nav');
+			expect(store.canUndo(BUDGET)).toBe(false);
+		});
+
+		it('refreshes the roll-ups at once', async () => {
+			editor();
+			focus('1.1.1', 'unitPrice');
+			await press('{Enter}');
+			await userEvent.keyboard('20{Enter}');
+			await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('€294.00'); // 2 x (3 x 30 + 7) + 100
+		});
+	});
+
+	describe('Escape while editing', () => {
+		it('cancels the edit, restoring the committed value, and returns to navigating that cell', async () => {
+			const store = editor();
+			const before = store.items;
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('99{Escape}');
+
+			expect(where()).toBe('1.1.1:quantity:nav');
+			await expect.element(page.getByLabelText('Quantity 1.1.1', { exact: true })).toHaveValue('1');
+			expect(store.items).toBe(before);
+			expect(store.canUndo(BUDGET)).toBe(false);
+
+			await press('{ArrowDown}'); // navigation works again straight away
+			expect(where()).toBe('1.1.2:quantity:nav');
+		});
+
+		it('also clears a validation message', async () => {
+			editor();
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('abc{Enter}');
+			await expect.element(page.getByText('Enter a valid number.')).toBeVisible();
+			await press('{Escape}');
+			await expect.element(page.getByText('Enter a valid number.')).not.toBeInTheDocument();
+			expect(where()).toBe('1.1.1:quantity:nav');
+		});
+
+		it('does nothing while only navigating', async () => {
+			editor();
+			focus('1.1.1', 'quantity');
+			await press('{Escape}');
+			expect(where()).toBe('1.1.1:quantity:nav');
+		});
+	});
+
+	describe('Tab and Shift+Tab while editing', () => {
+		it('commit and move to the next editable cell', async () => {
+			const store = editor();
+			focus('1.1.1', 'description');
+			await press('{Enter}');
+			await userEvent.keyboard('Renamed{Tab}');
+			expect(itemOf(store, 3).description).toBe('Renamed');
+			expect(where()).toBe('1.1.1:quantity:nav');
+			await press('{Tab}'); // while navigating, Tab is the browser's
+			expect(where()).not.toBe('1.1.1:unit:nav');
+		});
+
+		it('skip read-only cells: from a Group Unit to the next row, from a Line Unit price to the next row', async () => {
+			editor();
+			focus('1.1', 'unit'); // a Group: its Unit price, Total and the next Code are skipped
+			await press('{Enter}{Tab}');
+			expect(where()).toBe('1.1.1:description:nav');
+
+			focus('1.1.1', 'unitPrice');
+			await press('{Enter}{Tab}');
+			expect(where()).toBe('1.1.2:description:nav'); // past Total and the next Code
+		});
+
+		it('Shift+Tab commits and moves to the previous editable cell', async () => {
+			const store = editor();
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('7{Shift>}{Tab}{/Shift}');
+			expect(itemOf(store, 3).quantity).toBe('7');
+			expect(where()).toBe('1.1.1:description:nav');
+
+			focus('1.1.2', 'description');
+			await press('{Enter}{Shift>}{Tab}{/Shift}');
+			expect(where()).toBe('1.1.1:unitPrice:nav'); // back over the row boundary, skipping Code and Total
+		});
+
+		it('Shift+Tab skips a Group Unit price on the way back', async () => {
+			editor();
+			focus('1.1.1', 'description');
+			await press('{Enter}{Shift>}{Tab}{/Shift}');
+			expect(where()).toBe('1.1:unit:nav');
+		});
+
+		it('leave the grid at the very ends instead of trapping the keyboard', async () => {
+			editor();
+			focus('2', 'unitPrice');
+			await press('{Enter}');
+			const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+			document.activeElement!.dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(false); // the browser moves on, out of the cells
+		});
+
+		it('record one command per commit', async () => {
+			const store = editor();
+			focus('1.1.1', 'description');
+			await press('{Enter}');
+			await userEvent.keyboard('A{Tab}');
+			await press('{Enter}');
+			await userEvent.keyboard('2{Tab}');
+			store.undo(BUDGET);
+			expect(itemOf(store, 3).quantity).toBe('1'); // the second commit was its own command
+			expect(itemOf(store, 3).description).toBe('A');
+			store.undo(BUDGET);
+			expect(itemOf(store, 3).description).toBe('Item 3');
+			expect(store.canUndo(BUDGET)).toBe(false);
+		});
+	});
+
+	describe('an invalid commit stays in editing', () => {
+		it('keeps focus in the input with the validation showing, for Enter', async () => {
+			const store = editor();
+			const before = store.items;
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('abc{Enter}');
+
+			expect(where()).toBe('1.1.1:quantity:edit');
+			await expect.element(page.getByText('Enter a valid number.')).toBeVisible();
+			await expect.element(page.getByLabelText('Quantity 1.1.1', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+			expect(store.items).toBe(before);
+			expect(store.canUndo(BUDGET)).toBe(false);
+		});
+
+		it('keeps focus for Tab and Shift+Tab too, blocking the browser from moving on', async () => {
+			editor();
+			focus('1.1.1', 'unitPrice');
+			await press('{Enter}');
+			const input = document.activeElement as HTMLInputElement;
+			await userEvent.fill(input, '');
+			for (const tab of ['{Tab}', '{Shift>}{Tab}{/Shift}']) {
+				await press(tab);
+				expect(where(), tab).toBe('1.1.1:unitPrice:edit');
+			}
+			await expect.element(page.getByText('Enter a number.')).toBeVisible();
+		});
+
+		it('rejects a negative Quantity and stays', async () => {
+			editor();
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('-1{Enter}');
+			expect(where()).toBe('1.1.1:quantity:edit');
+			await expect.element(page.getByText('Quantity cannot be negative.')).toBeVisible();
+		});
+
+		it('moves on once the value is fixed', async () => {
+			const store = editor();
+			focus('1.1.1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('abc{Enter}');
+			expect(where()).toBe('1.1.1:quantity:edit');
+			await userEvent.fill(document.activeElement as HTMLInputElement, '5');
+			await press('{Enter}');
+			expect(itemOf(store, 3).quantity).toBe('5');
+			expect(where()).toBe('1.1.2:quantity:nav');
+			await expect.element(page.getByText('Enter a valid number.')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('collapsed rows', () => {
+		const collapse = (code: string) => page.getByRole('button', { name: `Collapse ${code}`, exact: true }).click();
+
+		it('arrow keys skip rows hidden by a collapsed Group', async () => {
+			editor();
+			await collapse('1.1');
+			focus('1.1', 'quantity');
+			await press('{ArrowDown}');
+			expect(where()).toBe('1.2:quantity:nav'); // not 1.1.1
+			await press('{ArrowUp}');
+			expect(where()).toBe('1.1:quantity:nav');
+		});
+
+		it('skip every level of nested collapsed rows', async () => {
+			editor();
+			await collapse('1.1');
+			await collapse('1');
+			focus('1', 'description');
+			await press('{ArrowDown}');
+			expect(where()).toBe('2:description:nav');
+			await press('{ArrowUp}');
+			expect(where()).toBe('1:description:nav');
+		});
+
+		it('Tab moves over hidden rows to the next visible editable cell', async () => {
+			editor();
+			await collapse('1.1');
+			focus('1.1', 'unit');
+			await press('{Enter}{Tab}');
+			expect(where()).toBe('1.2:description:nav'); // 1.1.1 and 1.1.2 are hidden
+			focus('1.2', 'description');
+			await press('{Enter}{Shift>}{Tab}{/Shift}');
+			expect(where()).toBe('1.1:unit:nav');
+		});
+
+		it('Enter moves down to the next visible row', async () => {
+			const store = editor();
+			await collapse('1');
+			focus('1', 'quantity');
+			await press('{Enter}');
+			await userEvent.keyboard('3{Enter}');
+			expect(itemOf(store, 1).quantity).toBe('3');
+			expect(where()).toBe('2:quantity:nav');
+		});
+
+		it('picks up again after expanding', async () => {
+			editor();
+			await collapse('1.1');
+			await page.getByRole('button', { name: 'Expand 1.1', exact: true }).click();
+			focus('1.1', 'quantity');
+			await press('{ArrowDown}');
+			expect(where()).toBe('1.1.1:quantity:nav');
+		});
+	});
+
+	describe('focus survives re-renders', () => {
+		it('stays on the active cell when the data under it changes', async () => {
+			const store = editor();
+			focus('1.1.1', 'quantity');
+			store.editItem(BUDGET, uuid(4), 'unitPrice', '9'); // totals and the whole table re-render
+			store.undo(BUDGET);
+			await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('€234.00');
+			expect(where()).toBe('1.1.1:quantity:nav');
+		});
+
+		it('stays in the input being edited while other rows change', async () => {
+			const store = editor();
+			focus('1.1.1', 'description');
+			await press('{Enter}');
+			await userEvent.keyboard('typing');
+			store.editItem(BUDGET, uuid(6), 'unitPrice', '5');
+			expect(where()).toBe('1.1.1:description:edit');
+			expect((document.activeElement as HTMLInputElement).value).toBe('typing');
+		});
+
+		it('settles on the neighbouring row when the focused row is deleted', async () => {
+			const store = editor();
+			focus('1.1.2', 'quantity');
+			store.deleteItem(BUDGET, uuid(4));
+			await expect.poll(where).toBe('1.2:quantity:nav'); // the row that took its place, same column
+		});
+
+		it('settles on the last row when the last row is deleted', async () => {
+			const store = editor();
+			focus('2', 'unit');
+			store.deleteItem(BUDGET, uuid(6));
+			await expect.poll(where).toBe('1.2:unit:nav');
+		});
+
+		it('keeps the cell when a row is added elsewhere', async () => {
+			const store = editor();
+			focus('1.2', 'quantity');
+			store.addTopLevelItem(BUDGET);
+			await expect.element(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+			expect(where()).toBe('1.2:quantity:nav');
+		});
+
+		it('makes a clicked input the active cell, so arrows continue from there after Escape', async () => {
+			editor();
+			await page.getByLabelText('Quantity 1.2', { exact: true }).click();
+			expect(where()).toBe('1.2:quantity:edit');
+			await press('{Escape}{ArrowDown}');
+			expect(where()).toBe('2:quantity:nav');
+		});
+
+		it('does not take focus when it was never in the grid', async () => {
+			const store = editor();
+			page.getByRole('button', { name: 'Add item', exact: true }).element().focus();
+			store.editItem(BUDGET, uuid(3), 'quantity', '2');
+			await expect.element(page.getByRole('button', { name: 'Add item', exact: true })).toHaveFocus();
+		});
+	});
+
+	describe('read-only mode', () => {
+		it('lets cells be navigated but never edited when there is no edit handler', async () => {
+			render(BudgetSpreadsheet, { rows: openStore(tree()).rows, currency: 'EUR' });
+			focus('1.1.1', 'quantity');
+			await press('{ArrowRight}');
+			expect(where()).toBe('1.1.1:unit:nav');
+			await press('{Enter}{F2}');
+			expect(where()).toBe('1.1.1:unit:nav');
+			expect(document.querySelector('tbody input')).toBeNull();
+		});
 	});
 });

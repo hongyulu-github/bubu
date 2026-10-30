@@ -581,3 +581,99 @@ describe('Collapsing groups (built static site)', () => {
 		expect(await codes()).toEqual(['1', '1.1', '2']);
 	});
 });
+
+describe('Keyboard navigation and editing (built static site)', () => {
+	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
+	/** Focus as "code:column:mode", where mode is edit inside an input and nav on a cell. */
+	const where = () =>
+		page.evaluate(() => {
+			const el = document.activeElement as HTMLElement | null;
+			const td = el?.closest<HTMLElement>('[data-cell]');
+			if (!el || !td) return null;
+			return `${td.closest('tr')!.dataset.code}:${td.dataset.cell!.split('|')[1]}:${el.tagName === 'INPUT' ? 'edit' : 'nav'}`;
+		});
+
+	it('moves, edits, tabs, validates and cancels from the keyboard alone, and the result is saved', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('grid', { name: 'Budget Items' }).waitFor();
+		await page.locator('tr[data-code="1.1"] td[data-cell$="|code"]').click(); // land on a cell
+		expect(await where()).toBe('1.1:code:nav');
+
+		await page.keyboard.press('ArrowRight');
+		expect(await where()).toBe('1.1:description:nav');
+		await page.keyboard.press('Enter'); // begin editing
+		expect(await where()).toBe('1.1:description:edit');
+		await page.keyboard.type('Banquet hall');
+		await page.keyboard.press('Tab'); // commit, next editable cell
+		expect(await where()).toBe('1.1:quantity:nav');
+
+		await page.keyboard.press('F2');
+		await page.keyboard.type('2.5');
+		await page.keyboard.press('Tab');
+		expect(await where()).toBe('1.1:unit:nav');
+		await page.keyboard.press('Enter');
+		await page.keyboard.type('hall');
+		await page.keyboard.press('Tab');
+		expect(await where()).toBe('1.1:unitPrice:nav');
+		await page.keyboard.press('Enter');
+		await page.keyboard.type('-100.5');
+		await page.keyboard.press('Enter'); // commit, move down
+		expect(await where()).toBe('2:unitPrice:nav');
+		await expect.poll(total).toBe('-€251.25');
+
+		// Typing in an input never navigates; an invalid value keeps the cursor there with a message.
+		await page.keyboard.press('ArrowLeft');
+		await page.keyboard.press('ArrowLeft');
+		expect(await where()).toBe('2:quantity:nav');
+		await page.keyboard.press('Enter');
+		await page.keyboard.type('abc');
+		await page.keyboard.press('ArrowLeft');
+		expect(await where()).toBe('2:quantity:edit');
+		await page.keyboard.press('Enter');
+		await page.getByText('Enter a valid number.').waitFor();
+		expect(await where()).toBe('2:quantity:edit');
+		await page.keyboard.press('Tab');
+		expect(await where()).toBe('2:quantity:edit');
+
+		// Escape abandons it and goes back to navigating.
+		await page.keyboard.press('Escape');
+		expect(await where()).toBe('2:quantity:nav');
+		expect(await page.getByLabel('Quantity 2', { exact: true }).inputValue()).toBe('1');
+		await page.keyboard.press('ArrowUp');
+		expect(await where()).toBe('1.1:quantity:nav');
+
+		// Read-only cells can be visited but not edited.
+		await page.keyboard.press('ArrowUp');
+		await page.keyboard.press('ArrowRight');
+		await page.keyboard.press('ArrowRight'); // row 1: its unit price, calculated for a Group
+		expect(await where()).toBe('1:unitPrice:nav');
+		await page.keyboard.press('Enter');
+		expect(await where()).toBe('1:unitPrice:nav');
+
+		// Everything committed above survived: it was saved automatically.
+		await page.reload();
+		await page.getByRole('grid', { name: 'Budget Items' }).waitFor();
+		expect(await page.getByLabel('Description 1.1', { exact: true }).inputValue()).toBe('Banquet hall');
+		expect(await page.getByLabel('Quantity 1.1', { exact: true }).inputValue()).toBe('2.5');
+		expect(await page.getByLabel('Unit 1.1', { exact: true }).inputValue()).toBe('hall');
+		expect(await page.getByLabel('Unit price 1.1', { exact: true }).inputValue()).toBe('-100.5');
+		await expect.poll(total).toBe('-€251.25');
+	});
+
+	it('skips rows hidden by a collapsed Group', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('button', { name: 'Collapse 1', exact: true }).click();
+		await page.locator('tr[data-code="1"] td[data-cell$="|code"]').click();
+		await page.keyboard.press('ArrowDown');
+		expect(await where()).toBe('2:code:nav'); // 1.1 is hidden
+	});
+
+	it('has the grid as a single stop in the Tab order', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('grid', { name: 'Budget Items' }).waitFor();
+		const stops = await page.evaluate(() => [...document.querySelectorAll('tbody td[data-cell]')].filter((td) => td.getAttribute('tabindex') === '0').length);
+		expect(stops).toBe(1);
+		const inputsInTabOrder = await page.evaluate(() => [...document.querySelectorAll('tbody input')].filter((i) => (i as HTMLInputElement).tabIndex >= 0).length);
+		expect(inputsInTabOrder).toBe(0);
+	});
+});
