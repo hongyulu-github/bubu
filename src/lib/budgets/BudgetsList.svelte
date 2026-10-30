@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import Button from '../components/Button.svelte';
+	import type { Budget } from '../budget/model';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
+	import ConfirmDeleteBudgetDialog from './ConfirmDeleteBudgetDialog.svelte';
 
 	let { store = budgetStore }: { store?: BudgetStore } = $props();
 
@@ -13,6 +15,24 @@
 		)
 	);
 	let message = $state('');
+	let confirmingDelete = $state(false);
+	let pendingDelete = $state<Budget | null>(null);
+
+	function requestDelete(budget: Budget) {
+		pendingDelete = budget;
+		confirmingDelete = true;
+	}
+
+	async function confirmDelete() {
+		const budget = pendingDelete;
+		pendingDelete = null;
+		if (!budget) return;
+		const result = store.deleteBudget(budget.id);
+		message = result.ok ? `Deleted “${budget.name}”.` : `“${budget.name}” could not be deleted.`;
+		// The deleted row (and the button that opened the dialog) is gone; land on a stable control.
+		await tick();
+		document.querySelector<HTMLElement>('[data-new-budget]')?.focus();
+	}
 
 	/** Copy a Budget, then move focus to the copy so keyboard users land on what was made. */
 	async function duplicate(budgetId: string, name: string) {
@@ -32,7 +52,7 @@
 <main>
 	<header>
 		<h1>Your Budgets</h1>
-		<a class="new" href="/budgets/new">New Budget</a>
+		<a class="new" href="/budgets/new" data-new-budget>New Budget</a>
 	</header>
 
 	{#if store.hydrationStatus === 'idle'}
@@ -41,6 +61,12 @@
 		<p class="note" role="alert">Browser storage is not available, so saved Budgets cannot be shown.</p>
 	{:else}
 		<p class="visually-hidden" role="status">{message}</p>
+		<ConfirmDeleteBudgetDialog
+			budget={pendingDelete}
+			itemCount={pendingDelete ? store.itemsOf(pendingDelete.id).length : 0}
+			bind:open={confirmingDelete}
+			onconfirm={confirmDelete}
+		/>
 
 		{#if unreadable.length > 0}
 			<p class="note warning" role="alert">
@@ -62,6 +88,7 @@
 						<Button compact aria-label="Duplicate {budget.name}" onclick={() => duplicate(budget.id, budget.name)}>
 							Duplicate
 						</Button>
+						<Button compact aria-label="Delete {budget.name}" onclick={() => requestDelete(budget)}>Delete</Button>
 					</li>
 				{/each}
 			</ul>

@@ -392,3 +392,27 @@ describe('Adding child Items (built static site)', () => {
 		expect(await page.getByLabel('Description 2.1', { exact: true }).count()).toBe(0);
 	});
 });
+
+describe('Deleting a Budget (built static site)', () => {
+	it('confirms before deleting, and removes only that Budget', async () => {
+		await page.goto(`${baseUrl}/budgets`);
+		await page.getByRole('link', { name: /Wedding/ }).waitFor();
+
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await page.getByRole('dialog', { name: 'Delete “Wedding”?' }).waitFor();
+		expect(await page.getByRole('dialog').innerText()).toContain('3 items');
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		expect(await page.locator('main ul li').count()).toBe(2); // cancel changed nothing
+
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
+		await expect.poll(() => page.locator('main ul li').count()).toBe(1);
+		expect(await page.getByRole('link', { name: /Renovation/ }).count()).toBe(1);
+		expect(await page.getByRole('link', { name: /Wedding/ }).count()).toBe(0);
+
+		// The other Budget still opens, with its own Items.
+		await page.getByRole('link', { name: /Renovation/ }).click();
+		await page.getByRole('heading', { name: 'Renovation' }).waitFor();
+		expect(await items()).toEqual(['1 Paint', '2 Flooring']);
+	});
+});

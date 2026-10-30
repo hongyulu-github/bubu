@@ -531,6 +531,102 @@ describe('adding Items', () => {
 	});
 });
 
+describe('deleteBudget', () => {
+	function openTwo() {
+		seedStorage();
+		bubuStorage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore();
+		store.hydrate();
+		return store;
+	}
+
+	it('removes only the selected Budget: its document and its Items', () => {
+		const store = openTwo();
+		const other = store.budgets.find((b) => b.id === B)!;
+		const otherItems = store.itemsOf(B);
+
+		expect(store.deleteBudget(A)).toEqual({ ok: true });
+
+		expect(store.budgets.map((b) => b.id)).toEqual([B]);
+		expect(store.itemsOf(A)).toEqual([]);
+		expect(store.budgets[0]).toBe(other); // the other Budget is the very same object
+		expect(store.itemsOf(B)).toBe(otherItems);
+	});
+
+	it('discards the Budget history but leaves every other Budget history alone', () => {
+		const store = openTwo();
+		store.editItem(A, uuid(3), 'quantity', '2');
+		store.editItem(B, uuid(1), 'description', 'edited');
+		expect(store.canUndo(A)).toBe(true);
+		expect(store.canUndo(B)).toBe(true);
+
+		store.deleteBudget(A);
+
+		expect(store.canUndo(A)).toBe(false);
+		expect(store.undo(A)).toBe(false);
+		expect(store.canUndo(B)).toBe(true);
+		expect(store.undo(B)).toBe(true);
+		expect(store.itemsOf(B)[0].description).toBe('item 1');
+	});
+
+	it('starts with a clean history if a Budget with the same id is ever added again', () => {
+		const store = openTwo();
+		store.editItem(A, uuid(3), 'quantity', '2');
+		const original = store.budgets.find((b) => b.id === A)!;
+		store.deleteBudget(A);
+		store.setBudget(original, nestedA());
+		expect(store.canUndo(A)).toBe(false);
+		expect(store.canRedo(A)).toBe(false);
+	});
+
+	it('clears the selection and the derived data when the open Budget is deleted', () => {
+		const store = openTwo();
+		store.select(A);
+		expect(store.rows.length).toBeGreaterThan(0);
+		store.deleteBudget(A);
+		expect(store.activeBudgetId).toBeNull();
+		expect(store.activeBudget).toBeNull();
+		expect(store.rows).toEqual([]);
+		expect(toString(store.grandTotal)).toBe('0');
+	});
+
+	it('keeps the selection when a different Budget is deleted', () => {
+		const store = openTwo();
+		store.select(B);
+		store.deleteBudget(A);
+		expect(store.activeBudgetId).toBe(B);
+		expect(store.rows).toHaveLength(1);
+	});
+
+	it('is not an Item command: no history is created and nothing can bring the Budget back', () => {
+		const store = openTwo();
+		store.deleteBudget(A);
+		expect(store.canUndo(B)).toBe(false);
+		expect(store.canRedo(B)).toBe(false);
+		expect(store.undo(A)).toBe(false);
+		expect(store.redo(A)).toBe(false);
+		expect(store.budgets.map((b) => b.id)).toEqual([B]);
+	});
+
+	it('does nothing for an unknown Budget', () => {
+		const store = openTwo();
+		const before = store.budgets;
+		expect(store.deleteBudget(uuid(777))).toEqual({ ok: false, reason: 'unknown-budget' });
+		expect(store.budgets).toBe(before);
+	});
+
+	it('only changes shared state: it writes nothing to storage itself (the autosave path owns persistence)', () => {
+		const store = openTwo();
+		const snapshot = JSON.stringify({ ...localStorage });
+		store.deleteBudget(A);
+		expect(JSON.stringify({ ...localStorage })).toBe(snapshot);
+	});
+
+	// Needs the autosave path from LUL-54, which does not exist yet: today a deleted Budget returns on reload
+	// because nothing removes it from storage. Turn this into a real test once autosave is wired.
+	it.todo('a deleted Budget does not return after a reload once autosave is wired (LUL-54)');
+});
+
 describe('addChildItem', () => {
 	function openLine() {
 		bubuStorage.writeBudget(budget(A, 'Child test'));
@@ -941,7 +1037,7 @@ describe('Budget documents', () => {
 		expect(store.activeBudget?.name).toBe('One renamed');
 		expect(toString(store.grandTotal)).toBe('5'); // Items kept when only the document is replaced
 
-		store.removeBudget(A);
+		expect(store.deleteBudget(A)).toEqual({ ok: true });
 		expect(store.budgets).toEqual([]);
 		expect(store.activeBudget).toBeNull();
 		expect(store.rows).toEqual([]);

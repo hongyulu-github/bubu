@@ -222,6 +222,35 @@ describe('independent Budgets', () => {
 	});
 });
 
+describe('clear', () => {
+	it('discards one Budget undo and redo stacks and leaves the others', () => {
+		const history = new CommandHistory();
+		history.execute(BUDGET_A, { before: s0, after: s1 });
+		history.execute(BUDGET_A, { before: s1, after: s2 });
+		history.undo(BUDGET_A);
+		history.execute(BUDGET_B, { before: s0, after: s3 });
+
+		history.clear(BUDGET_A);
+
+		expect(history.canUndo(BUDGET_A)).toBe(false);
+		expect(history.canRedo(BUDGET_A)).toBe(false);
+		expect(history.undo(BUDGET_A)).toBeNull();
+		expect(history.redo(BUDGET_A)).toBeNull();
+		expect(history.canUndo(BUDGET_B)).toBe(true);
+		expect(history.undo(BUDGET_B)).toEqual(s0);
+	});
+
+	it('does nothing for a Budget with no history, and lets the id start fresh afterwards', () => {
+		const history = new CommandHistory();
+		expect(() => history.clear(BUDGET_A)).not.toThrow();
+		history.execute(BUDGET_A, { before: s0, after: s1 });
+		history.clear(BUDGET_A);
+		history.execute(BUDGET_A, { before: s1, after: s2 });
+		expect(history.undo(BUDGET_A)).toEqual(s1);
+		expect(history.canUndo(BUDGET_A)).toBe(false); // only the command after the clear remains
+	});
+});
+
 describe('session-only memory', () => {
 	it('a fresh module (a reload) starts with empty history', async () => {
 		const id = '44444444-4444-4444-8444-444444444444';

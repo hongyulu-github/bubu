@@ -1,4 +1,4 @@
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
@@ -124,6 +124,120 @@ describe('BudgetsList', () => {
 		await page.getByRole('button', { name: 'Duplicate Blank' }).click();
 		const copy = store.budgets.find((b) => b.name === 'Blank (copy)')!;
 		expect(store.itemsOf(copy.id)).toEqual([]);
+	});
+
+	it('asks before deleting a Budget, naming it and what goes with it', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+
+		const dialog = page.getByRole('dialog', { name: 'Delete “Wedding”?' });
+		await expect.element(dialog).toBeVisible();
+		await expect.element(dialog).toHaveAccessibleDescription(
+			'This permanently deletes the Budget. Its 3 items are deleted with it. It cannot be undone.'
+		);
+	});
+
+	it('words the impact for an empty Budget and for a single item', async () => {
+		seed(); // Renovation has two items
+		const store = newStore();
+		const blank = store.createBudget({ name: 'Blank', currency: 'USD' });
+		if (!blank.ok) throw new Error('creation failed');
+		store.setItems(B, [store.itemsOf(B)[0]]);
+		render(BudgetsList, { store });
+
+		await page.getByRole('button', { name: 'Delete Blank' }).click();
+		await expect.element(page.getByRole('dialog', { name: 'Delete “Blank”?' })).toHaveAccessibleDescription(
+			'This permanently deletes the Budget. It has no items. It cannot be undone.'
+		);
+		await page.getByRole('button', { name: 'Cancel' }).click();
+
+		await page.getByRole('button', { name: 'Delete Renovation' }).click();
+		await expect.element(page.getByRole('dialog', { name: 'Delete “Renovation”?' })).toHaveAccessibleDescription(
+			'This permanently deletes the Budget. Its 1 item is deleted with it. It cannot be undone.'
+		);
+	});
+
+	it('changes nothing when deletion is cancelled, by button or Escape', async () => {
+		seed();
+		const store = newStore();
+		render(BudgetsList, { store });
+		const budgets = store.budgets;
+		const items = store.itemsOf(A);
+
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		expect(store.budgets).toBe(budgets);
+		expect(store.itemsOf(A)).toBe(items);
+		expect(document.querySelectorAll('main ul li')).toHaveLength(2);
+
+		await page.getByRole('button', { name: 'Delete Renovation' }).click();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		expect(store.budgets).toBe(budgets);
+		expect(document.querySelectorAll('main ul li')).toHaveLength(2);
+	});
+
+	it('on confirmation removes only that Budget, its Items and its history, leaving the other untouched', async () => {
+		seed();
+		const store = newStore();
+		render(BudgetsList, { store });
+		store.editItem(A, `00000000-0000-4000-8000-${(101).toString().padStart(12, '0')}`, 'description', 'edited A');
+		store.editItem(B, `00000000-0000-4000-8000-${(201).toString().padStart(12, '0')}`, 'description', 'edited B');
+		const otherItems = store.itemsOf(B);
+		expect(store.canUndo(A)).toBe(true);
+		expect(store.canUndo(B)).toBe(true);
+
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
+
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		expect(document.querySelectorAll('main ul li')).toHaveLength(1);
+		await expect.element(page.getByRole('link', { name: /Renovation/ })).toBeVisible();
+		expect(document.body.textContent).not.toContain('Wedding (');
+		expect(store.budgets.map((b) => b.id)).toEqual([B]);
+		expect(store.itemsOf(A)).toEqual([]);
+		expect(store.canUndo(A)).toBe(false); // its history went with it
+		expect(store.itemsOf(B)).toBe(otherItems); // the other Budget's Items are untouched...
+		expect(store.canUndo(B)).toBe(true); // ...and so is its history
+		await expect.element(page.getByRole('status')).toHaveTextContent('Deleted “Wedding”.');
+	});
+
+	it('puts focus on a stable control after deleting', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
+		await expect.element(page.getByRole('link', { name: 'New Budget' })).toHaveFocus();
+	});
+
+	it('shows the empty state after the last Budget is deleted', async () => {
+		seed();
+		const store = newStore();
+		render(BudgetsList, { store });
+		for (const name of ['Delete Wedding', 'Delete Renovation']) {
+			await page.getByRole('button', { name }).click();
+			await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
+		}
+		await expect.element(page.getByText('No saved Budgets yet.')).toBeVisible();
+		expect(store.budgets).toEqual([]);
+	});
+
+	it('does not write to storage itself when deleting (persistence is wired elsewhere)', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		const before = JSON.stringify({ ...localStorage });
+		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
+		expect(JSON.stringify({ ...localStorage })).toBe(before);
+	});
+
+	it('offers Delete for every Budget, each named for its Budget', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		await expect.element(page.getByRole('button', { name: 'Delete Wedding' })).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Delete Renovation' })).toBeVisible();
 	});
 
 	it('shows a loading state before hydration and an empty state with no Budgets', async () => {

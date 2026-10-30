@@ -65,6 +65,8 @@ export type DuplicateBudgetResult =
 	| { ok: false; reason: 'unknown-budget' }
 	| { ok: false; reason: 'invalid'; issues: ValidationIssue[] };
 
+export type DeleteBudgetResult = { ok: true } | { ok: false; reason: 'unknown-budget' };
+
 export type RenameBudgetResult =
 	| { ok: true; changed: boolean; budget: Budget }
 	| { ok: false; reason: 'unknown-budget' }
@@ -228,12 +230,20 @@ export class BudgetStore {
 		return { ok: true, budget: copy.budget };
 	}
 
-	/** Remove a Budget from state (its history stays in memory until the page reloads). */
-	removeBudget(budgetId: Uuid): void {
+	/**
+	 * Delete a Budget: its document, its Items and its in-memory history, and nothing of any other
+	 * Budget. A document-level action, so it is not an Item command and cannot be undone. The caller
+	 * confirms first. This only changes shared state; persisting the removal is the autosave path's job.
+	 */
+	deleteBudget(budgetId: Uuid): DeleteBudgetResult {
+		if (!this.budgets.some((budget) => budget.id === budgetId)) return { ok: false, reason: 'unknown-budget' };
 		this.budgets = this.budgets.filter((budget) => budget.id !== budgetId);
 		const { [budgetId]: _removed, ...rest } = this.#itemsByBudget;
 		this.#itemsByBudget = rest;
 		if (this.activeBudgetId === budgetId) this.activeBudgetId = null;
+		this.#history.clear(budgetId);
+		this.#historyVersion++;
+		return { ok: true };
 	}
 
 	/** Replace a Budget's Items without recording history (e.g. an import). Instantly recomputes derived data. */

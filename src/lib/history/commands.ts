@@ -65,6 +65,11 @@ export class CommandHistory {
 		return snapshot(command.after);
 	}
 
+	/** Discard a Budget's undo and redo stacks, e.g. when the Budget itself is deleted. Others are untouched. */
+	clear(budgetId: Uuid): void {
+		this.#stacks.delete(budgetId);
+	}
+
 	canUndo(budgetId: Uuid): boolean {
 		return (this.#stacks.get(budgetId)?.undo.length ?? 0) > 0;
 	}
