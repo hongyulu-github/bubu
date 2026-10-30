@@ -359,3 +359,36 @@ describe('Duplicating a Budget (built static site)', () => {
 		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(false);
 	});
 });
+
+describe('Adding child Items (built static site)', () => {
+	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
+
+	it('confirms the Line-to-Group conversion, keeps the Quantity, and undoes the whole thing', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByLabel('Unit price 2', { exact: true }).waitFor(); // Music is a Line
+		await page.getByLabel('Unit price 2', { exact: true }).fill('-250.5');
+		await page.keyboard.press('Enter');
+		await page.getByLabel('Quantity 2', { exact: true }).fill('3');
+		await page.keyboard.press('Enter');
+		await expect.poll(total).toBe('-751.5 EUR');
+
+		// Cancel: nothing changes.
+		await page.getByRole('button', { name: 'Add child to 2', exact: true }).click();
+		await page.getByRole('dialog', { name: /into a group/ }).waitFor();
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('-250.5');
+
+		// Confirm: converted, Quantity kept, child added.
+		await page.getByRole('button', { name: 'Add child to 2', exact: true }).click();
+		await page.getByRole('button', { name: 'Convert and add item' }).click();
+		await page.getByLabel('Description 2.1', { exact: true }).waitFor();
+		expect(await page.getByLabel('Quantity 2', { exact: true }).inputValue()).toBe('3');
+		expect(await page.getByLabel('Unit price 2', { exact: true }).count()).toBe(0);
+		await expect.poll(total).toBe('0 EUR');
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		await expect.poll(total).toBe('-751.5 EUR');
+		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('-250.5');
+		expect(await page.getByLabel('Description 2.1', { exact: true }).count()).toBe(0);
+	});
+});

@@ -1,3 +1,4 @@
+import { convertLineToGroup, describeConversion } from './convert';
 import { createItem, type Item, type NewItemInput, type Uuid } from './model';
 import { buildItemTree, getSiblings } from './tree';
 
@@ -44,4 +45,34 @@ export function insertSiblingItem(items: readonly Item[], siblingId: Uuid, field
 		return index !== undefined && candidate.sortIndex !== index ? { ...candidate, sortIndex: index } : candidate;
 	});
 	return { ok: true, items: [...next, item], item };
+}
+
+export type InsertChildResult =
+	| { ok: true; items: Item[]; item: Item; converted: boolean; previousUnitPrice: string | undefined }
+	| { ok: false; reason: 'unknown-item' };
+
+/**
+ * Add a new Item as the last child of `parentId`. If the parent is a Line this also converts it to
+ * a Group in the same step (see `convertLineToGroup`): its manual Unit price is reset to 0 while
+ * Description, Quantity and Unit are kept, and `previousUnitPrice` reports what was replaced. Adding
+ * to an existing Group converts nothing. Depth is unlimited.
+ */
+export function insertChildItem(items: readonly Item[], parentId: Uuid, fields: NewItemFields = {}): InsertChildResult {
+	const parent = items.find((candidate) => candidate.id === parentId);
+	if (!parent) return { ok: false, reason: 'unknown-item' };
+
+	const conversion = describeConversion(items, parentId);
+	const prepared = convertLineToGroup(items, parentId);
+
+	const children = prepared.filter((candidate) => candidate.parentId === parentId);
+	const sortIndex = children.length === 0 ? 0 : Math.max(...children.map((child) => child.sortIndex)) + 1;
+	const item = createItem({ ...fields, budgetId: parent.budgetId, parentId, sortIndex });
+
+	return {
+		ok: true,
+		items: [...prepared, item],
+		item,
+		converted: conversion !== null,
+		previousUnitPrice: conversion?.unitPrice
+	};
 }

@@ -17,10 +17,12 @@
 		onadd?: (siblingId: string) => void;
 		/** Delete this Item (and anything beneath it). Shows a row action when given. */
 		ondelete?: (itemId: string) => void;
+		/** Add a child inside this Item (a Line becomes a Group). Shows a row action when given. */
+		onaddchild?: (parentId: string) => void;
 	}
 
-	let { rows, onedit, onadd, ondelete }: Props = $props();
-	const hasActions = $derived(onadd !== undefined || ondelete !== undefined);
+	let { rows, onedit, onadd, ondelete, onaddchild }: Props = $props();
+	const hasActions = $derived(onadd !== undefined || ondelete !== undefined || onaddchild !== undefined);
 </script>
 
 <!--
@@ -48,7 +50,7 @@
 			<col style="width: 6.5rem" />
 			<col style="width: 8rem" />
 			<col style="width: 8rem" />
-			{#if hasActions}<col style="width: 14rem" />{/if}
+			{#if hasActions}<col style="width: 19rem" />{/if}
 		</colgroup>
 		<thead>
 			<tr>
@@ -102,6 +104,9 @@
 							<div class="actions">
 								{#if onadd}
 									<Button compact aria-label="Add item below {row.code}" onclick={() => onadd(row.id)}>Add below</Button>
+								{/if}
+								{#if onaddchild}
+									<Button compact aria-label="Add child to {row.code}" onclick={() => onaddchild(row.id)}>Add child</Button>
 								{/if}
 								{#if ondelete}
 									<Button compact aria-label="Delete {row.code}" onclick={() => ondelete(row.id)}>Delete</Button>

@@ -531,6 +531,69 @@ describe('adding Items', () => {
 	});
 });
 
+describe('addChildItem', () => {
+	function openLine() {
+		bubuStorage.writeBudget(budget(A, 'Child test'));
+		bubuStorage.writeItems(A, [item(A, 1, null, '-250.50', '3'), item(A, 2, null, '7')]);
+		const store = newStore();
+		store.hydrate();
+		store.select(A);
+		return store;
+	}
+	const LINE = uuid(1);
+
+	it('converts a Line in one command: child added, manual price replaced, Quantity kept', () => {
+		const store = openLine();
+		const before = store.itemsOf(A);
+		expect(toString(store.grandTotal)).toBe('-744.50'); // 3 x -250.50 + 7
+
+		const result = store.addChildItem(A, LINE);
+		expect(result).toMatchObject({ ok: true, converted: true, previousUnitPrice: '-250.50' });
+		const parent = store.itemsOf(A).find((i) => i.id === LINE)!;
+		expect(parent).toMatchObject({ unitPrice: '0', quantity: '3' });
+		expect(store.rows.map((row) => `${row.code} ${row.kind}`)).toEqual(['1 group', '1.1 line', '2 line']);
+		expect(store.canUndo(A)).toBe(true);
+
+		expect(store.undo(A)).toBe(true);
+		expect(store.canUndo(A)).toBe(false); // the whole conversion was one command
+		expect(store.itemsOf(A)).toEqual(before);
+		expect(store.itemsOf(A).find((i) => i.id === LINE)!.unitPrice).toBe('-250.50'); // manual price restored
+	});
+
+	it('undo restores and redo reapplies the entire conversion with the same identities', () => {
+		const store = openLine();
+		const added = store.addChildItem(A, LINE);
+		if (!added.ok) throw new Error('rejected');
+		const after = store.itemsOf(A);
+
+		store.undo(A);
+		expect(store.itemsOf(A).some((i) => i.id === added.item.id)).toBe(false);
+
+		expect(store.redo(A)).toBe(true);
+		expect(store.itemsOf(A)).toEqual(after);
+		expect(store.itemsOf(A).find((i) => i.id === added.item.id)?.parentId).toBe(LINE);
+		expect(store.itemsOf(A).find((i) => i.id === LINE)!.unitPrice).toBe('0');
+		expect(store.canRedo(A)).toBe(false);
+	});
+
+	it('adds to an existing Group without converting anything', () => {
+		const store = openLine();
+		store.addChildItem(A, LINE);
+		const second = store.addChildItem(A, LINE);
+		expect(second).toMatchObject({ ok: true, converted: false });
+		expect(store.rows.map((row) => row.code)).toEqual(['1', '1.1', '1.2', '2']);
+		store.undo(A);
+		expect(store.rows.map((row) => row.code)).toEqual(['1', '1.1', '2']);
+	});
+
+	it('does nothing for unknown Items and Budgets', () => {
+		const store = openLine();
+		expect(store.addChildItem(A, uuid(999))).toEqual({ ok: false, reason: 'unknown-item' });
+		expect(store.addChildItem(uuid(777), LINE)).toEqual({ ok: false, reason: 'unknown-budget' });
+		expect(store.canUndo(A)).toBe(false);
+	});
+});
+
 describe('duplicateBudget', () => {
 	function open() {
 		seedStorage();

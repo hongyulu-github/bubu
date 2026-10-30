@@ -2,7 +2,13 @@ import { calculateTotals, type ItemAmounts } from '../budget/calculate';
 import { applyFieldEdit, type EditResult, type EditableField } from '../budget/edit';
 import { deleteItemSubtree } from '../budget/delete';
 import { duplicateBudget } from '../budget/duplicate';
-import { insertSiblingItem, insertTopLevelItem, type InsertResult, type NewItemFields } from '../budget/insert';
+import {
+	insertChildItem,
+	insertSiblingItem,
+	insertTopLevelItem,
+	type InsertResult,
+	type NewItemFields
+} from '../budget/insert';
 import { renameBudgetDocument } from '../budget/rename';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
 import type { Budget, Item, ItemKind, Uuid } from '../budget/model';
@@ -44,6 +50,10 @@ export type MutationResult =
 
 export type AddItemResult =
 	| { ok: true; item: Item }
+	| { ok: false; reason: 'unknown-budget' | 'unknown-item' | 'invalid' };
+
+export type AddChildResult =
+	| { ok: true; item: Item; converted: boolean; previousUnitPrice: string | undefined }
 	| { ok: false; reason: 'unknown-budget' | 'unknown-item' | 'invalid' };
 
 export type DeleteItemResult =
@@ -287,6 +297,20 @@ export class BudgetStore {
 		const committed = this.execute(budgetId, deleted.items);
 		if (!committed.ok) return { ok: false, reason: 'invalid' };
 		return { ok: true, removedIds: deleted.removedIds, normalizedParentId: deleted.normalizedParentId };
+	}
+
+	/**
+	 * Add a child under an Item as one undoable command. Adding the first child to a Line also
+	 * converts it to a Group in the same command (its manual Unit price is replaced; undo restores
+	 * it). The caller is responsible for confirming that conversion first, via `describeConversion`.
+	 */
+	addChildItem(budgetId: Uuid, parentId: Uuid, fields?: NewItemFields): AddChildResult {
+		if (!this.budgets.some((budget) => budget.id === budgetId)) return { ok: false, reason: 'unknown-budget' };
+		const inserted = insertChildItem(this.itemsOf(budgetId), parentId, fields);
+		if (!inserted.ok) return inserted;
+		const committed = this.execute(budgetId, inserted.items);
+		if (!committed.ok) return { ok: false, reason: 'invalid' };
+		return { ok: true, item: inserted.item, converted: inserted.converted, previousUnitPrice: inserted.previousUnitPrice };
 	}
 
 	#commitInsert(budgetId: Uuid, inserted: InsertResult): AddItemResult {

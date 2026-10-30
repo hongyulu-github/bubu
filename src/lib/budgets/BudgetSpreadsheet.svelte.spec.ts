@@ -446,7 +446,7 @@ describe('adding Items', () => {
 		editor(nested());
 		const headers = [...document.querySelectorAll('thead th')].map((th) => th.textContent?.trim());
 		expect(headers).toEqual(['Code', 'Description', 'Quantity', 'Unit', 'Unit price', 'Total', 'Actions']);
-		expect(document.querySelectorAll('tbody button')).toHaveLength(10); // Add below and Delete on each of the 5 rows
+		expect(document.querySelectorAll('tbody button')).toHaveLength(15); // Add below, Add child and Delete on each of the 5 rows
 	});
 });
 
@@ -592,5 +592,119 @@ describe('deleting Items', () => {
 	it('shows no Delete action in a read-only table', async () => {
 		render(BudgetSpreadsheet, { rows: openStore(nested()).rows });
 		expect(document.querySelector('tbody button')).toBeNull();
+	});
+});
+
+describe('adding children', () => {
+	function editor(items: Item[]) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const rowIds = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-item-id'));
+	const codes = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-code'));
+	const kinds = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-kind'));
+	const grandTotal = () => page.getByLabelText('Grand total');
+	const dialog = () => page.getByRole('dialog', { name: /into a group\?/ });
+	const addChild = (code: string) => page.getByRole('button', { name: `Add child to ${code}`, exact: true });
+
+	// A Line with a manual price and a Quantity above 1, then a plain Line.
+	const lines = () => [item(1, null, '-250.5', '3'), item(2, null, '7')];
+
+	it('warns before converting a Line, naming the manual price that will be replaced and the Quantity that is kept', async () => {
+		editor(lines());
+		await addChild('1').click();
+
+		await expect.element(dialog()).toBeVisible();
+		await expect.element(page.getByRole('dialog').getByText('-250.5', { exact: true })).toBeVisible();
+		await expect.element(page.getByText('is replaced by the total of its items')).toBeVisible();
+		await expect.element(page.getByText('3 is kept')).toBeVisible();
+		expect(rowIds()).toHaveLength(2); // nothing added yet
+	});
+
+	it('makes no command and no change when the conversion is cancelled', async () => {
+		const store = editor(lines());
+		const items = store.items;
+		await addChild('1').click();
+		await page.getByRole('button', { name: 'Cancel' }).click();
+
+		await expect.element(dialog()).not.toBeInTheDocument();
+		expect(store.items).toBe(items);
+		expect(store.canUndo(BUDGET)).toBe(false);
+		await expect.element(page.getByLabelText('Unit price 1', { exact: true })).toHaveValue('-250.5'); // still a Line
+
+		await addChild('1').click();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(dialog()).not.toBeInTheDocument();
+		expect(store.items).toBe(items);
+		expect(store.canUndo(BUDGET)).toBe(false);
+		await expect.element(grandTotal()).toHaveTextContent('-744.5 EUR');
+	});
+
+	it('on confirmation converts the Line to a Group with the child, keeping Quantity', async () => {
+		const store = editor(lines());
+		await addChild('1').click();
+		await page.getByRole('button', { name: 'Convert and add item' }).click();
+
+		expect(codes()).toEqual(['1', '1.1', '2']);
+		expect(kinds()).toEqual(['group', 'line', 'line']);
+		expect(document.querySelector('[aria-label="Unit price 1"]')).toBeNull(); // now calculated
+		await expect.element(page.getByLabelText('Quantity 1', { exact: true })).toHaveValue('3'); // not reset to 1
+		await expect.element(page.getByLabelText('Description 1.1', { exact: true })).toHaveFocus();
+		expect(table()[1]).toEqual(['1.1', '', '1', '', '0', '0']); // child defaults
+		await expect.element(grandTotal()).toHaveTextContent('7 EUR'); // the group is now priced from its (empty) child
+		expect(store.itemsOf(BUDGET).find((i) => i.id === uuid(1))!.unitPrice).toBe('0');
+	});
+
+	it('handles a positive manual price too', async () => {
+		editor([item(1, null, '4500.50', '2')]);
+		await addChild('1').click();
+		await expect.element(page.getByRole('dialog').getByText('4500.50', { exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Convert and add item' }).click();
+		expect(kinds()).toEqual(['group', 'line']);
+		await expect.element(page.getByLabelText('Quantity 1', { exact: true })).toHaveValue('2');
+	});
+
+	it('undo restores the whole conversion in one step and redo reapplies it with the same identities', async () => {
+		const store = editor(lines());
+		const before = rowIds();
+		await addChild('1').click();
+		await page.getByRole('button', { name: 'Convert and add item' }).click();
+		const after = rowIds();
+		expect(after).toHaveLength(3);
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		expect(rowIds()).toEqual(before);
+		await expect.element(page.getByLabelText('Unit price 1', { exact: true })).toHaveValue('-250.5'); // manual price back
+		await expect.element(page.getByLabelText('Quantity 1', { exact: true })).toHaveValue('3');
+		await expect.element(grandTotal()).toHaveTextContent('-744.5 EUR');
+		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeDisabled(); // a single command
+
+		await page.getByRole('button', { name: 'Redo' }).click();
+		expect(rowIds()).toEqual(after);
+		expect(kinds()).toEqual(['group', 'line', 'line']);
+		expect(store.itemsOf(BUDGET).find((i) => i.id === uuid(1))!.unitPrice).toBe('0');
+	});
+
+	it('adds a child to an existing Group straight away, with no conversion warning', async () => {
+		editor(nested());
+		await addChild('1.1').click(); // an existing Group
+		expect(document.querySelector('dialog[open]')).toBeNull();
+		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.1.3', '1.2']);
+		await expect.element(page.getByLabelText('Description 1.1.3', { exact: true })).toHaveFocus();
+		await expect.element(grandTotal()).toHaveTextContent('134 EUR');
+	});
+
+	it('adds children at any nesting depth', async () => {
+		editor([item(1, null, '0'), item(2, 1, '0'), item(3, 2, '40', '2')]);
+		await addChild('1.1.1').click(); // a Line three levels down
+		await page.getByRole('button', { name: 'Convert and add item' }).click();
+		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.1.1']);
+		expect(kinds()).toEqual(['group', 'group', 'group', 'line']);
+	});
+
+	it('offers Add child on every row, with an accessible name per row', async () => {
+		editor(nested());
+		expect(document.querySelectorAll('tbody button[aria-label^="Add child to"]')).toHaveLength(5);
 	});
 });

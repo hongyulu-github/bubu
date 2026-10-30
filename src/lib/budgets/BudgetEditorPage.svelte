@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { describeConversion, type ConversionImpact } from '../budget/convert';
 	import { describeDeletion, type DeletionImpact } from '../budget/delete';
 	import { toString } from '../budget/numbers';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import Button from '../components/Button.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
+	import ConfirmConversionDialog from './ConfirmConversionDialog.svelte';
 	import ConfirmDeleteDialog from './ConfirmDeleteDialog.svelte';
 	import RenameBudgetDialog from './RenameBudgetDialog.svelte';
 
@@ -24,6 +26,8 @@
 	// Only show Items once the store has switched to this route's Budget, so a previously open
 	// Budget's Items can never flash up under the wrong heading.
 	let renaming = $state(false);
+	let confirmingConversion = $state(false);
+	let pendingConversion = $state<ConversionImpact | null>(null);
 	let confirmingDelete = $state(false);
 	let pendingDelete = $state<DeletionImpact | null>(null);
 	const ready = $derived(store.activeBudgetId === budgetId);
@@ -57,6 +61,28 @@
 		if (pendingDelete) store.deleteItem(budgetId, pendingDelete.itemId);
 		pendingDelete = null;
 		void focusAfterDelete();
+	}
+
+	async function addChildNow(parentId: string) {
+		const added = store.addChildItem(budgetId, parentId);
+		if (added.ok) await focusDescription(added.item.id);
+	}
+
+	/** Adding to a Group just adds. Adding to a Line converts it, so that is confirmed first. */
+	function requestAddChild(parentId: string) {
+		const conversion = describeConversion(store.itemsOf(budgetId), parentId);
+		if (!conversion) {
+			void addChildNow(parentId);
+			return;
+		}
+		pendingConversion = conversion;
+		confirmingConversion = true;
+	}
+
+	function confirmConversion() {
+		const parentId = pendingConversion?.parentId;
+		pendingConversion = null;
+		if (parentId) void addChildNow(parentId);
 	}
 
 	async function addTopLevel() {
@@ -96,6 +122,7 @@
 		</header>
 
 		<RenameBudgetDialog {budgetId} bind:open={renaming} {store} />
+		<ConfirmConversionDialog impact={pendingConversion} bind:open={confirmingConversion} onconfirm={confirmConversion} />
 		<ConfirmDeleteDialog impact={pendingDelete} bind:open={confirmingDelete} onconfirm={confirmDelete} />
 
 		{#if ready}
@@ -113,6 +140,7 @@
 				onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
 				onadd={addBelow}
 				ondelete={requestDelete}
+				onaddchild={requestAddChild}
 			/>
 		{/if}
 
@@ -132,7 +160,7 @@
 
 <style>
 	main {
-		max-width: 64rem;
+		max-width: 72rem;
 		margin: 0 auto;
 		padding: var(--space-6) var(--space-4);
 		display: flex;
