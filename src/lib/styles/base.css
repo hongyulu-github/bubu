@@ -1,0 +1,15 @@
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: var(--font-family);
+	font-size: var(--font-size-body);
+	line-height: var(--line-height-body);
+	-webkit-font-smoothing: antialiased;
+}

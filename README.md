@@ -30,6 +30,8 @@ Layout: application code in `src/lib` (import via `#lib`), static routes in `src
 
 Tests: `*.spec.ts` run in Node; `*.svelte.spec.ts` run in a real browser via `vitest-browser-svelte`. See `src/lib/smoke` for examples.
 
+Design tokens and base components (`Button`, `Input`, `NumberInput`, `Dialog`, `TableCell`) are documented in [docs/design-foundation.md](docs/design-foundation.md), including source and license. Run `npm run dev` and open `/design` for a live preview.
+
 ## Version-control workflow
 
 Clone:
