@@ -8,6 +8,28 @@ BuBu is a budget builder. This repository holds the application source code only
 - Remote: `git@github.com:hongyulu-github/bubu.git`
 - Default branch: `main`
 
+## Development
+
+BuBu is a static, client-only SvelteKit app (Svelte 5 runes, TypeScript, `adapter-static`). There are no server endpoints or accounts. Requires Node 22+.
+
+```sh
+npm install
+npx playwright install chromium   # once, for browser component tests
+```
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Prerender the app to static files in `build/` |
+| `npm run preview` | Serve the production build locally |
+| `npm run check` | Type-check with `svelte-check` |
+| `npm test` | Run unit tests (Node) and component tests (real Chromium) once |
+| `npm run test:unit` | Run the tests in watch mode |
+
+Layout: application code in `src/lib` (import via `#lib`), static routes in `src/routes`. Every route is prerendered (`src/routes/+layout.ts`), so code that touches browser globals such as `window` or `localStorage` must run inside `onMount`, an `$effect`, or an event handler, or the build will fail.
+
+Tests: `*.spec.ts` run in Node; `*.svelte.spec.ts` run in a real browser via `vitest-browser-svelte`. See `src/lib/smoke` for examples.
+
 ## Version-control workflow
 
 Clone:
