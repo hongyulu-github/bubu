@@ -8,20 +8,27 @@
 		hint?: string;
 		/** Validation message. Marks the field invalid and is announced politely. */
 		error?: string;
+		/** Keep the label for assistive technology but hide it visually (e.g. inside a table cell). */
+		hideLabel?: boolean;
+		/** Tighter, borderless-until-hover styling for dense layouts such as spreadsheet cells. */
+		compact?: boolean;
+		/** Right-align the value and use tabular figures. */
+		numeric?: boolean;
 	}
 
-	let { label, value = $bindable(''), hint, error, disabled, ...rest }: Props = $props();
+	let { label, value = $bindable(''), hint, error, disabled, hideLabel = false, compact = false, numeric = false, ...rest }: Props = $props();
 
 	const id = $props.id();
 	const hintId = `${id}-hint`;
 	const messageId = `${id}-message`;
 </script>
 
-<div class="field">
-	<label for={id}>{label}</label>
+<div class="field" class:compact>
+	<label for={id} class:visually-hidden={hideLabel}>{label}</label>
 	<input
 		{id}
 		bind:value
+		class:numeric
 		{disabled}
 		aria-invalid={error ? 'true' : undefined}
 		aria-describedby={[hint ? hintId : '', messageId].filter(Boolean).join(' ')}
@@ -70,6 +77,44 @@
 		color: var(--color-disabled-text);
 		border-color: transparent;
 		cursor: not-allowed;
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	input.numeric {
+		text-align: end;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.compact,
+	.compact input {
+		width: 100%;
+		min-width: 0;
+	}
+
+	.compact input {
+		min-height: 2.25rem;
+		padding: 0 var(--space-2);
+		border-color: transparent;
+		border-radius: var(--radius-sm);
+		background: transparent;
+	}
+
+	.compact input:hover:not(:disabled) {
+		border-color: var(--color-border-strong);
+	}
+
+	.compact input[aria-invalid='true'] {
+		border-color: var(--color-danger);
 	}
 
 	.hint,

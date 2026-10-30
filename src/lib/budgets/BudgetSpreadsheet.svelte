@@ -1,18 +1,48 @@
 <script lang="ts">
+	import { canEditField, type EditResult, type EditableField } from '../budget/edit';
 	import { toString } from '../budget/numbers';
 	import TableCell from '../components/TableCell.svelte';
 	import type { BudgetRow } from '../state/budgets.svelte';
+	import ItemCellEditor from './ItemCellEditor.svelte';
 
-	let { rows }: { rows: readonly BudgetRow[] } = $props();
+	interface Props {
+		rows: readonly BudgetRow[];
+		/**
+		 * Commit an edit. When omitted the table is read-only. Which cells are editable at all is
+		 * decided here (see `canEditField`), not by the caller.
+		 */
+		onedit?: (itemId: string, field: EditableField, text: string) => EditResult;
+	}
+
+	let { rows, onedit }: Props = $props();
 </script>
 
 <!--
-	Read-only rendering of the derived rows. Code, Total and a Group's Unit price are computed, so
-	their cells are marked read-only and hold no controls. Amounts are shown as plain decimals;
-	currency formatting is a separate adapter.
+	The derived rows. Code, Total and a Group's Unit price are computed, so their cells are marked
+	read-only and hold no controls; the other cells are inputs when `onedit` is given. Amounts are
+	shown as plain decimals; currency formatting is a separate adapter.
 -->
+{#snippet editor(row: BudgetRow, field: EditableField, column: string, value: string)}
+	{#if canEditField(row.kind, field)}
+		<ItemCellEditor
+			{field}
+			label="{column} {row.code}"
+			{value}
+			oncommit={(text) => onedit!(row.id, field, text)}
+		/>
+	{/if}
+{/snippet}
+
 <div class="scroll">
 	<table aria-label="Budget Items">
+		<colgroup>
+			<col style="width: 5rem" />
+			<col />
+			<col style="width: 7.5rem" />
+			<col style="width: 7.5rem" />
+			<col style="width: 9rem" />
+			<col style="width: 9rem" />
+		</colgroup>
 		<thead>
 			<tr>
 				<TableCell header scope="col">Code</TableCell>
@@ -28,10 +58,34 @@
 				{@const group = row.kind === 'group'}
 				<tr data-kind={row.kind} data-code={row.code}>
 					<TableCell readonly><span class="code">{row.code}</span></TableCell>
-					<TableCell depth={row.depth} strong={group}>{row.item.description}</TableCell>
-					<TableCell numeric>{toString(row.amounts.quantity)}</TableCell>
-					<TableCell>{row.item.unit ?? ''}</TableCell>
-					<TableCell numeric readonly={group}>{toString(row.amounts.unitPrice)}</TableCell>
+					<TableCell depth={row.depth} strong={group}>
+						{#if onedit}
+							{@render editor(row, 'description', 'Description', row.item.description)}
+						{:else}
+							{row.item.description}
+						{/if}
+					</TableCell>
+					<TableCell numeric>
+						{#if onedit}
+							{@render editor(row, 'quantity', 'Quantity', row.item.quantity)}
+						{:else}
+							{toString(row.amounts.quantity)}
+						{/if}
+					</TableCell>
+					<TableCell>
+						{#if onedit}
+							{@render editor(row, 'unit', 'Unit', row.item.unit ?? '')}
+						{:else}
+							{row.item.unit ?? ''}
+						{/if}
+					</TableCell>
+					<TableCell numeric readonly={group}>
+						{#if onedit && !group}
+							{@render editor(row, 'unitPrice', 'Unit price', row.item.unitPrice)}
+						{:else}
+							{toString(row.amounts.unitPrice)}
+						{/if}
+					</TableCell>
 					<TableCell numeric readonly strong>{toString(row.amounts.total)}</TableCell>
 				</tr>
 			{/each}

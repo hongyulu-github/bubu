@@ -1,4 +1,5 @@
 import { calculateTotals, type ItemAmounts } from '../budget/calculate';
+import { applyFieldEdit, type EditResult, type EditableField } from '../budget/edit';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
 import type { Budget, Item, ItemKind, Uuid } from '../budget/model';
 import { buildItemTree } from '../budget/tree';
@@ -190,6 +191,23 @@ export class BudgetStore {
 		this.#apply(budgetId, current);
 		this.#historyVersion++;
 		return { ok: true };
+	}
+
+	/**
+	 * Commit one inline cell edit as a single history command. Invalid, forbidden and no-op edits
+	 * change nothing and record nothing; a real change updates the Items (and so every derived
+	 * value) at once and can be undone as one step.
+	 */
+	editItem(budgetId: Uuid, itemId: Uuid, field: EditableField, text: string): EditResult {
+		if (!this.budgets.some((budget) => budget.id === budgetId)) {
+			return { ok: false, reason: 'unknown-item', message: 'That Budget no longer exists.' };
+		}
+		const edit = applyFieldEdit(this.itemsOf(budgetId), itemId, field, text);
+		if (!edit.ok || !edit.changed) return edit;
+
+		const committed = this.execute(budgetId, edit.items);
+		if (!committed.ok) return { ok: false, reason: 'invalid', message: committed.issues[0]?.message ?? 'The edit is not valid.' };
+		return edit;
 	}
 
 	/** Undo the Budget's last command. Returns false when there is nothing to undo. */

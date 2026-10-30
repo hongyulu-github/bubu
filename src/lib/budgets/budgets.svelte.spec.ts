@@ -38,7 +38,7 @@ function seed() {
 /** Code and Description of every row in the Budget table, e.g. "1.1 Hall rental". */
 const outline = () =>
 	[...document.querySelectorAll('table[aria-label="Budget Items"] tbody tr')].map((row) =>
-		[...row.querySelectorAll('td')].slice(0, 2).map((cell) => cell.textContent?.trim()).join(' ')
+		[...row.querySelectorAll('td')].slice(0, 2).map((cell) => cell.querySelector('input')?.value ?? cell.textContent?.trim()).join(' ')
 	);
 
 const newStore = (hydrate = true) => {
@@ -124,7 +124,7 @@ describe('BudgetEditorPage', () => {
 		await expect.element(page.getByText('EUR', { exact: true })).toBeVisible();
 		const items = outline();
 		expect(items).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
-		expect(document.body.textContent).not.toContain('Paint');
+		expect(outline().join('|')).not.toContain('Paint'); // Items live in inputs, so check their values
 	});
 
 	it('keeps two Budget routes from mixing Items when the route changes', async () => {
@@ -147,19 +147,19 @@ describe('BudgetEditorPage', () => {
 		await expect.element(page.getByRole('heading', { name: 'Wedding' })).toBeVisible();
 
 		store.execute(A, [...store.itemsOf(A), item(A, 9, null, 'Cake')]);
-		await expect.element(page.getByText('Cake')).toBeVisible();
+		await expect.poll(outline).toContain('3 Cake');
 		expect(store.canUndo(A)).toBe(true);
 
 		await view.rerender({ budgetId: B, store });
 		await expect.element(page.getByRole('heading', { name: 'Renovation' })).toBeVisible();
 		expect(store.canUndo(B)).toBe(false);
-		expect(document.body.textContent).not.toContain('Cake');
+		expect(outline().join('|')).not.toContain('Cake');
 
 		await view.rerender({ budgetId: A, store });
-		await expect.element(page.getByText('Cake')).toBeVisible();
+		await expect.poll(outline).toContain('3 Cake');
 		expect(store.canUndo(A)).toBe(true);
 		expect(store.undo(A)).toBe(true);
-		await expect.element(page.getByText('Cake')).not.toBeInTheDocument();
+		await expect.poll(outline).not.toContain('3 Cake');
 	});
 
 	it('handles a missing id without selecting any other Budget', async () => {
@@ -171,7 +171,7 @@ describe('BudgetEditorPage', () => {
 		expect(store.activeBudgetId).toBeNull();
 		expect(store.activeBudget).toBeNull();
 		expect(document.body.textContent).not.toContain('Wedding');
-		expect(document.body.textContent).not.toContain('Paint');
+		expect(document.querySelector('table')).toBeNull(); // no Items of any Budget
 		await expect.element(page.getByRole('link', { name: /All Budgets/ })).toHaveAttribute('href', '/budgets');
 	});
 
@@ -215,6 +215,6 @@ describe('BudgetEditorPage', () => {
 
 		render(BudgetEditorPage, { budgetId: B, store: newStore() });
 		await expect.element(page.getByRole('heading', { name: 'Renovation' })).toBeVisible();
-		await expect.element(page.getByText('Flooring')).toBeVisible();
+		await expect.poll(outline).toContain('2 Flooring');
 	});
 });

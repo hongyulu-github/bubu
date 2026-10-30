@@ -38,6 +38,18 @@ export function parseDecimal(text: string): ParseResult {
 	return { ok: true, value: { coefficient, scale: fraction.length } };
 }
 
+/** User-facing message for a parse failure; shared by every numeric input. */
+export function parseErrorMessage(error: ParseError): string {
+	switch (error) {
+		case 'blank':
+			return 'Enter a number.';
+		case 'not-a-number':
+			return 'Enter a valid number.';
+		case 'negative-quantity':
+			return 'Quantity cannot be negative.';
+	}
+}
+
 /** A Quantity is any decimal greater than or equal to zero (fractions allowed). */
 export function parseQuantity(text: string): ParseResult {
 	const result = parseDecimal(text);

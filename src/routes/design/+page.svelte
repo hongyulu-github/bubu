@@ -3,7 +3,7 @@
 
 	let open = $state(false);
 	let name = $state('');
-	let amount = $state<number | null>(1200.5);
+	let amount = $state('1200.50');
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 
 	// Preview-only override so both themes can be compared without changing the OS setting.
@@ -40,7 +40,7 @@
 		<div class="stack">
 			<Input label="Budget name" hint="Shown in your list" bind:value={name} />
 			<Input label="With error" value="Oops" error="This name is already used." />
-			<NumberInput label="Amount" min={0} bind:value={amount} hint="Plain decimal, e.g. 1200.50" />
+			<NumberInput label="Amount" bind:value={amount} hint="Plain decimal, e.g. 1200.50; negatives allowed" />
 			<Input label="Disabled" value="Read only" disabled />
 		</div>
 	</section>

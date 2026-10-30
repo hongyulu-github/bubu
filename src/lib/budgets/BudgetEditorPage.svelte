@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { toString } from '../budget/numbers';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
+	import Button from '../components/Button.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
 
 	let { budgetId, store = budgetStore }: { budgetId: string; store?: BudgetStore } = $props();
@@ -43,10 +44,17 @@
 			{/if}
 		</header>
 
+		{#if ready}
+			<div class="history" role="group" aria-label="History">
+				<Button disabled={!store.canUndo(budgetId)} onclick={() => store.undo(budgetId)}>Undo</Button>
+				<Button disabled={!store.canRedo(budgetId)} onclick={() => store.redo(budgetId)}>Redo</Button>
+			</div>
+		{/if}
+
 		{#if ready && rows.length === 0}
 			<p class="note">This Budget has no Items yet.</p>
 		{:else if rows.length > 0}
-			<BudgetSpreadsheet {rows} />
+			<BudgetSpreadsheet {rows} onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)} />
 		{/if}
 	{:else if loadFailure}
 		<h1>This Budget could not be loaded</h1>
@@ -99,6 +107,11 @@
 		justify-content: space-between;
 		gap: var(--space-4);
 		margin-bottom: var(--space-3);
+	}
+
+	.history {
+		display: flex;
+		gap: var(--space-2);
 	}
 
 	.total {

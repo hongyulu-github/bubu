@@ -61,7 +61,7 @@ afterEach(async () => {
 const items = () =>
 	page.locator('table[aria-label="Budget Items"] tbody tr').evaluateAll((rows) =>
 		rows.map((row) =>
-			[...row.querySelectorAll('td')].slice(0, 2).map((cell) => cell.textContent?.trim()).join(' ')
+			[...row.querySelectorAll('td')].slice(0, 2).map((cell) => cell.querySelector('input')?.value ?? cell.textContent?.trim()).join(' ')
 		)
 	);
 
@@ -123,6 +123,7 @@ describe('Budgets list and editor routes (built static site)', () => {
 		expect(text).not.toContain('Wedding');
 		expect(text).not.toContain('Renovation');
 		expect(text).not.toContain('Venue');
+		expect(await page.locator('table').count()).toBe(0); // Items are in inputs, so innerText alone cannot prove their absence
 
 		await page.getByRole('link', { name: /All Budgets/ }).click();
 		await page.getByRole('link', { name: /Wedding/ }).waitFor();
@@ -181,5 +182,40 @@ describe('Creating a Budget (built static site)', () => {
 		await page.goto(`${baseUrl}/budgets/new`);
 		await page.getByRole('heading', { name: 'New Budget' }).waitFor();
 		expect(await page.getByLabel('Currency').inputValue()).toBe('');
+	});
+});
+
+describe('Editing cells (built static site)', () => {
+	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
+
+	it('commits edits, refreshes the totals, validates input, and undoes', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByLabel('Unit price 1.1', { exact: true }).waitFor();
+		expect(await total()).toBe('0 EUR');
+
+		await page.getByLabel('Unit price 1.1', { exact: true }).fill('-100');
+		await page.keyboard.press('Enter');
+		await page.getByLabel('Quantity 1.1', { exact: true }).fill('2.5');
+		await page.keyboard.press('Enter');
+		await expect.poll(total).toBe('-250.0 EUR'); // -100 x 2.5, rolled up through the Group
+
+		// A Group's own Unit price is calculated, so it has no input.
+		expect(await page.getByLabel('Unit price 1', { exact: true }).count()).toBe(0);
+
+		// Invalid values show a message and change nothing.
+		await page.getByLabel('Quantity 1.1', { exact: true }).fill('abc');
+		await page.keyboard.press('Enter');
+		await page.getByText('Enter a valid number.').waitFor();
+		expect(await total()).toBe('-250.0 EUR');
+		await page.keyboard.press('Escape');
+		expect(await page.getByLabel('Quantity 1.1', { exact: true }).inputValue()).toBe('2.5');
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		expect(await page.getByLabel('Quantity 1.1', { exact: true }).inputValue()).toBe('1');
+		await page.getByRole('button', { name: 'Undo' }).click();
+		await expect.poll(total).toBe('0 EUR');
+		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(true);
+		await page.getByRole('button', { name: 'Redo' }).click();
+		expect(await page.getByLabel('Unit price 1.1', { exact: true }).inputValue()).toBe('-100');
 	});
 });

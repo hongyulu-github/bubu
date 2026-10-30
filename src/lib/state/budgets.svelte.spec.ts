@@ -319,6 +319,100 @@ describe('history and Budget switching', () => {
 	});
 });
 
+describe('editItem', () => {
+	function openA() {
+		seedStorage();
+		const store = newStore();
+		store.hydrate();
+		store.select(A);
+		return store;
+	}
+	const LINE_10 = uuid(3); // 10 x 1 inside the inner Group
+	const INNER = uuid(2);
+
+	it('commits a valid edit as exactly one history command and refreshes the roll-ups', () => {
+		const store = openA();
+		expect(toString(store.grandTotal)).toBe('134');
+
+		expect(store.editItem(A, LINE_10, 'unitPrice', '-20')).toMatchObject({ ok: true, changed: true });
+		// inner unit -20 + 10 = -10, total -30; outer (-30 + 7) x 2 = -46
+		expect(toString(store.grandTotal)).toBe('-46');
+		expect(store.itemsOf(A).find((i) => i.id === LINE_10)?.unitPrice).toBe('-20');
+
+		expect(store.undo(A)).toBe(true);
+		expect(store.canUndo(A)).toBe(false); // one edit was one command
+		expect(store.itemsOf(A).find((i) => i.id === LINE_10)?.unitPrice).toBe('10');
+		expect(toString(store.grandTotal)).toBe('134');
+	});
+
+	it('restores every prior value on undo, across several edits in order', () => {
+		const store = openA();
+		store.editItem(A, LINE_10, 'quantity', '0.5');
+		store.editItem(A, INNER, 'quantity', '4');
+		store.editItem(A, LINE_10, 'description', 'Renamed');
+		expect(store.itemsOf(A).find((i) => i.id === LINE_10)).toMatchObject({ quantity: '0.5', description: 'Renamed' });
+
+		store.undo(A);
+		expect(store.itemsOf(A).find((i) => i.id === LINE_10)?.description).toBe('item 3');
+		store.undo(A);
+		expect(store.itemsOf(A).find((i) => i.id === INNER)?.quantity).toBe('3');
+		store.undo(A);
+		expect(store.itemsOf(A)).toEqual(nestedA());
+		expect(store.canUndo(A)).toBe(false);
+		expect(store.canRedo(A)).toBe(true);
+	});
+
+	it('a new commit after an undo clears redo', () => {
+		const store = openA();
+		store.editItem(A, LINE_10, 'quantity', '2');
+		store.undo(A);
+		expect(store.canRedo(A)).toBe(true);
+
+		store.editItem(A, LINE_10, 'quantity', '3');
+		expect(store.canRedo(A)).toBe(false);
+		expect(store.redo(A)).toBe(false);
+	});
+
+	it('does not touch data or history for invalid values', () => {
+		const store = openA();
+		const before = store.items;
+		for (const [field, text] of [['quantity', 'abc'], ['quantity', ''], ['quantity', '-1'], ['unitPrice', ''], ['unitPrice', '1e3']] as const) {
+			expect(store.editItem(A, LINE_10, field, text), `${field}=${text}`).toMatchObject({ ok: false, reason: 'invalid' });
+		}
+		expect(store.items).toBe(before);
+		expect(store.canUndo(A)).toBe(false);
+		expect(toString(store.grandTotal)).toBe('134');
+	});
+
+	it('rejects a Group Unit price and unknown Items without recording anything', () => {
+		const store = openA();
+		expect(store.editItem(A, uuid(1), 'unitPrice', '5')).toMatchObject({ ok: false, reason: 'read-only' });
+		expect(store.editItem(A, uuid(999), 'description', 'x')).toMatchObject({ ok: false, reason: 'unknown-item' });
+		expect(store.editItem(uuid(777), LINE_10, 'description', 'x')).toMatchObject({ ok: false });
+		expect(store.canUndo(A)).toBe(false);
+	});
+
+	it('records nothing when the committed value is unchanged', () => {
+		const store = openA();
+		const before = store.items;
+		expect(store.editItem(A, LINE_10, 'quantity', '1')).toMatchObject({ ok: true, changed: false });
+		expect(store.editItem(A, LINE_10, 'description', 'item 3')).toMatchObject({ ok: true, changed: false });
+		expect(store.items).toBe(before);
+		expect(store.canUndo(A)).toBe(false);
+	});
+
+	it('keeps edits in each Budget separate', () => {
+		seedStorage();
+		bubuStorage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore();
+		store.hydrate();
+		store.editItem(A, LINE_10, 'quantity', '9');
+		expect(store.canUndo(A)).toBe(true);
+		expect(store.canUndo(B)).toBe(false);
+		expect(store.itemsOf(B)[0].unitPrice).toBe('100');
+	});
+});
+
 describe('createBudget', () => {
 	it('adds one root Budget with no Items and a zero grand total, without selecting it', () => {
 		const store = newStore();

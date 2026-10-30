@@ -1,4 +1,4 @@
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
@@ -45,9 +45,10 @@ afterEach(() => {
 });
 
 /** Every body row as an array of its six cell texts. */
+const cellText = (cell: Element) => cell.querySelector('input')?.value ?? cell.textContent?.trim() ?? '';
 const table = () =>
 	[...document.querySelectorAll('table[aria-label="Budget Items"] tbody tr')].map((row) =>
-		[...row.querySelectorAll('td')].map((cell) => cell.textContent?.trim() ?? '')
+		[...row.querySelectorAll('td')].map(cellText)
 	);
 
 // Outer (x2) = Inner (x3) of [10 x1, 5 x2] + Line 7.   Inner: unit 20, total 60.   Outer: unit 67, total 134.
@@ -202,5 +203,154 @@ describe('Budget root and grand total', () => {
 
 		store.undo(BUDGET);
 		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('134 EUR');
+	});
+});
+
+describe('inline editing', () => {
+	function editor(items: Item[] = nested()) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const field = (column: string, code: string) => page.getByLabelText(`${column} ${code}`, { exact: true });
+	const itemOf = (store: BudgetStore, n: number) => store.itemsOf(BUDGET).find((i) => i.id === uuid(n))!;
+	const total = () => page.getByLabelText('Grand total');
+
+	it('makes Description, Quantity and Unit editable on every row, and Unit price on Lines only', async () => {
+		editor();
+		for (const code of ['1', '1.1', '1.1.1']) {
+			await expect.element(field('Description', code)).toBeVisible();
+			await expect.element(field('Quantity', code)).toBeVisible();
+			await expect.element(field('Unit', code)).toBeVisible();
+		}
+		await expect.element(field('Unit price', '1.1.1')).toBeVisible();
+		await expect.element(field('Unit price', '1.2')).toBeVisible();
+		expect(document.querySelector('[aria-label="Unit price 1"]')).toBeNull(); // Group
+		expect(document.querySelector('[aria-label="Unit price 1.1"]')).toBeNull(); // nested Group
+	});
+
+	it('never puts an input in the Code, Total or Group Unit price cells', async () => {
+		editor();
+		for (const row of document.querySelectorAll('tbody tr')) {
+			const cells = [...row.querySelectorAll('td')];
+			expect(cells[0].querySelector('input, select, textarea, button'), 'Code').toBeNull();
+			expect(cells[5].querySelector('input, select, textarea, button'), 'Total').toBeNull();
+			if (row.getAttribute('data-kind') === 'group') {
+				expect(cells[4].querySelector('input, select, textarea, button'), 'Group Unit price').toBeNull();
+			}
+		}
+	});
+
+	it('commits a Quantity on Enter, refreshing roll-ups at once, as one command', async () => {
+		const store = editor();
+		await field('Quantity', '1.1').fill('4');
+		await userEvent.keyboard('{Enter}');
+
+		await expect.element(total()).toHaveTextContent('174 EUR');
+		expect(itemOf(store, 2).quantity).toBe('4');
+		expect(table()[1]).toEqual(['1.1', 'Item 2', '4', '', '20', '80']);
+		store.undo(BUDGET);
+		expect(store.canUndo(BUDGET)).toBe(false);
+	});
+
+	it('commits on blur as well', async () => {
+		const store = editor();
+		await field('Description', '1.1.1').fill('Renamed line');
+		field('Description', '1.1.1').element().blur();
+		await expect.poll(() => itemOf(store, 3).description).toBe('Renamed line');
+		expect(store.canUndo(BUDGET)).toBe(true);
+	});
+
+	it('commits a fractional Quantity, a Unit and a negative Line price (discount) exactly', async () => {
+		const store = editor();
+		await field('Quantity', '1.1.2').fill('0.5');
+		await userEvent.keyboard('{Enter}');
+		await field('Unit', '1.1.2').fill('hours');
+		await userEvent.keyboard('{Enter}');
+		await field('Unit price', '1.2').fill('-250.25');
+		await userEvent.keyboard('{Enter}');
+
+		expect(itemOf(store, 4)).toMatchObject({ quantity: '0.5', unit: 'hours' });
+		expect(itemOf(store, 5).unitPrice).toBe('-250.25');
+		// inner: 10 + 5 x 0.5 = 12.5 -> x3 = 37.5; outer: (37.5 + -250.25) x 2 = -425.5
+		await expect.element(total()).toHaveTextContent('-425.50 EUR');
+		expect(table()[4]).toEqual(['1.2', 'Item 5', '1', '', '-250.25', '-250.25']);
+	});
+
+	it('shows validation for blank, non-numeric and negative-Quantity commits without changing data or history', async () => {
+		const store = editor();
+		const before = store.items;
+
+		await field('Quantity', '1.1.1').fill('abc');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByText('Enter a valid number.')).toBeVisible();
+		await expect.element(field('Quantity', '1.1.1')).toHaveAttribute('aria-invalid', 'true');
+
+		await field('Unit price', '1.1.1').fill('');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByText('Enter a number.')).toBeVisible();
+
+		await field('Quantity', '1.1.2').fill('-1');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByText('Quantity cannot be negative.')).toBeVisible();
+
+		expect(store.items).toBe(before);
+		expect(store.canUndo(BUDGET)).toBe(false);
+		await expect.element(total()).toHaveTextContent('134 EUR');
+	});
+
+	it('cancels an edit with Escape, restoring the committed value without touching data or history', async () => {
+		const store = editor();
+		const before = store.items;
+		await field('Quantity', '1.1.1').fill('99');
+		await userEvent.keyboard('{Escape}');
+
+		await expect.element(field('Quantity', '1.1.1')).toHaveValue('1');
+		expect(store.items).toBe(before);
+		expect(store.canUndo(BUDGET)).toBe(false);
+		await expect.element(total()).toHaveTextContent('134 EUR');
+	});
+
+	it('clears an error when the edit is cancelled', async () => {
+		editor();
+		await field('Quantity', '1.1.1').fill('abc');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByText('Enter a valid number.')).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(page.getByText('Enter a valid number.')).not.toBeInTheDocument();
+		await expect.element(field('Quantity', '1.1.1')).toHaveValue('1');
+	});
+
+	it('does not record a command when the value did not change', async () => {
+		const store = editor();
+		await field('Quantity', '1.1.1').fill('1');
+		await userEvent.keyboard('{Enter}');
+		expect(store.canUndo(BUDGET)).toBe(false);
+	});
+
+	it('undo restores the prior value in the inputs and a new commit clears redo', async () => {
+		const store = editor();
+		await field('Quantity', '1.1').fill('4');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(total()).toHaveTextContent('174 EUR');
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		await expect.element(field('Quantity', '1.1')).toHaveValue('3');
+		await expect.element(total()).toHaveTextContent('134 EUR');
+		await expect.element(page.getByRole('button', { name: 'Redo' })).toBeEnabled();
+
+		await field('Quantity', '1.1').fill('5');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
+		expect(store.canRedo(BUDGET)).toBe(false);
+	});
+
+	it('keeps the Undo and Redo buttons in step with history', async () => {
+		editor();
+		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+		await expect.element(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
+		await field('Unit', '1').fill('lot');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
 	});
 });
