@@ -4,6 +4,7 @@
 	import { describeConversion, type ConversionImpact } from '../budget/convert';
 	import { describeDeletion, type DeletionImpact } from '../budget/delete';
 	import { formatMoney } from '../budget/currency';
+	import { parseHistoryShortcut } from '../budget/shortcuts';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import Button from '../components/Button.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
@@ -26,6 +27,28 @@
 
 	// Only show Items once the store has switched to this route's Budget, so a previously open
 	// Budget's Items can never flash up under the wrong heading.
+	/**
+	 * Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes this Budget's Item commands. Text being typed keeps the
+	 * browser's own undo: an input with uncommitted text, any field in a dialog, and fields outside the grid
+	 * are left alone. A cell input with nothing uncommitted hands over to Item undo, like a committed cell.
+	 */
+	function leavesToBrowser(target: EventTarget | null): boolean {
+		if (!(target instanceof HTMLElement)) return false;
+		if (target.closest('dialog')) return true;
+		if (!(target.matches('input, textarea, select') || target.isContentEditable)) return false;
+		const cellEditor = target.closest('.editor');
+		return !cellEditor || cellEditor.hasAttribute('data-dirty');
+	}
+
+	function onkeydown(event: KeyboardEvent) {
+		if (!ready || event.defaultPrevented) return;
+		const shortcut = parseHistoryShortcut(event);
+		if (!shortcut || leavesToBrowser(event.target)) return;
+		event.preventDefault();
+		if (shortcut === 'undo') store.undo(budgetId);
+		else store.redo(budgetId);
+	}
+
 	let renaming = $state(false);
 	let confirmingConversion = $state(false);
 	let pendingConversion = $state<ConversionImpact | null>(null);
@@ -108,6 +131,8 @@
 	const noneCollapsed = $derived(!groupIds.some((id) => collapsed.has(id)));
 </script>
 
+<svelte:window {onkeydown} />
+
 <main>
 	<p><a class="back" href="/budgets">← All Budgets</a></p>
 
@@ -139,8 +164,12 @@
 		{#if ready}
 			<div class="toolbar">
 				<div class="history" role="group" aria-label="History">
-					<Button disabled={!store.canUndo(budgetId)} onclick={() => store.undo(budgetId)}>Undo</Button>
-					<Button disabled={!store.canRedo(budgetId)} onclick={() => store.redo(budgetId)}>Redo</Button>
+					<Button aria-keyshortcuts="Control+Z Meta+Z" disabled={!store.canUndo(budgetId)} onclick={() => store.undo(budgetId)}>Undo</Button>
+					<Button
+						aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
+						disabled={!store.canRedo(budgetId)}
+						onclick={() => store.redo(budgetId)}>Redo</Button
+					>
 				</div>
 				{#if groupIds.length > 0}
 					<div class="history" role="group" aria-label="Groups">

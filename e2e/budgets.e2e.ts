@@ -677,3 +677,123 @@ describe('Keyboard navigation and editing (built static site)', () => {
 		expect(inputsInTabOrder).toBe(0);
 	});
 });
+
+describe('Undo and redo shortcuts (built static site)', () => {
+	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
+	const field = (label: string) => page.getByLabel(label, { exact: true });
+	const commit = async (label: string, text: string) => {
+		await field(label).fill(text);
+		await page.keyboard.press('Enter');
+	};
+	const undoDisabled = () => page.getByRole('button', { name: 'Undo' }).isDisabled();
+	const redoDisabled = () => page.getByRole('button', { name: 'Redo' }).isDisabled();
+
+	it('undoes and redoes cell edits with Ctrl and with Cmd, and saves what they leave', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await field('Unit price 2').waitFor();
+		await commit('Unit price 2', '50');
+		await expect.poll(total).toBe('€50.00');
+
+		await page.keyboard.press('Control+z');
+		await expect.poll(total).toBe('€0.00');
+		await page.keyboard.press('Meta+Shift+z');
+		await expect.poll(total).toBe('€50.00');
+		await page.keyboard.press('Meta+z');
+		await expect.poll(total).toBe('€0.00');
+		await page.keyboard.press('Control+Shift+z');
+		await expect.poll(total).toBe('€50.00');
+		expect(await field('Unit price 2').inputValue()).toBe('50');
+
+		// The result of the last redo was saved; the history itself was not.
+		await page.reload();
+		await field('Unit price 2').waitFor();
+		expect(await field('Unit price 2').inputValue()).toBe('50');
+		expect(await undoDisabled()).toBe(true);
+		expect(await redoDisabled()).toBe(true);
+		await page.keyboard.press('Control+z');
+		expect(await field('Unit price 2').inputValue()).toBe('50'); // empty history: nothing to undo
+		const keys = await page.evaluate(() => Object.keys(localStorage));
+		expect(keys.every((key) => /^bubu:(budget|items):/.test(key))).toBe(true);
+	});
+
+	it('undoes adding a child with its conversion, and a subtree deletion', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await field('Unit price 2').waitFor();
+		await commit('Unit price 2', '7');
+		await commit('Quantity 2', '3');
+		await expect.poll(total).toBe('€21.00');
+
+		await page.getByRole('button', { name: 'Add child to 2', exact: true }).click();
+		await page.getByRole('button', { name: 'Convert and add item' }).click();
+		await field('Description 2.1').waitFor();
+		await page.keyboard.press('Escape'); // leave the new row's input
+		await expect.poll(total).toBe('€0.00');
+
+		await page.keyboard.press('Control+z'); // the whole conversion, in one step
+		await expect.poll(total).toBe('€21.00');
+		expect(await field('Unit price 2').inputValue()).toBe('7');
+		expect(await field('Quantity 2').inputValue()).toBe('3');
+		await page.keyboard.press('Meta+Shift+z');
+		await expect.poll(total).toBe('€0.00');
+		await page.keyboard.press('Control+z');
+
+		// Subtree deletion.
+		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+		await expect.poll(() => page.locator('tbody tr').count()).toBe(1);
+		await page.keyboard.press('Meta+z');
+		await expect.poll(() => page.locator('tbody tr').count()).toBe(3);
+		expect(await field('Description 1.1').inputValue()).toBe('Hall rental');
+		await page.keyboard.press('Control+Shift+z');
+		await expect.poll(() => page.locator('tbody tr').count()).toBe(1);
+	});
+
+	it('keeps each Budget history separate when switching', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await field('Quantity 2').waitFor();
+		await commit('Quantity 2', '9');
+
+		await page.getByRole('link', { name: /All Budgets/ }).click();
+		await page.getByRole('link', { name: /Renovation/ }).click();
+		await page.getByRole('heading', { name: 'Renovation' }).waitFor();
+		expect(await undoDisabled()).toBe(true); // B has no history of its own
+		await page.keyboard.press('Control+z');
+		expect(await items()).toEqual(['1 Paint', '2 Flooring']);
+
+		await page.getByRole('link', { name: /All Budgets/ }).click();
+		await page.getByRole('link', { name: /Wedding/ }).click();
+		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		expect(await field('Quantity 2').inputValue()).toBe('9'); // untouched by B's undo
+		expect(await undoDisabled()).toBe(false);
+		await page.keyboard.press('Control+z');
+		expect(await field('Quantity 2').inputValue()).toBe('1');
+	});
+
+	it('drops redo once a new change follows an undo', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await field('Quantity 2').waitFor();
+		await commit('Quantity 2', '2');
+		await page.keyboard.press('Control+z');
+		expect(await redoDisabled()).toBe(false);
+		await commit('Quantity 2', '3');
+		expect(await redoDisabled()).toBe(true);
+		await page.keyboard.press('Control+Shift+z');
+		expect(await field('Quantity 2').inputValue()).toBe('3');
+	});
+
+	it('leaves the browser its own undo while text is being typed', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await field('Quantity 2').waitFor();
+		await commit('Quantity 2', '4');
+		await field('Description 2').click();
+		await page.keyboard.type(' extra'); // uncommitted text in the cell
+		await page.keyboard.press('Control+z');
+		await page.keyboard.press('Meta+z');
+
+		expect(await field('Quantity 2').inputValue()).toBe('4'); // the committed command was not undone
+		expect(await undoDisabled()).toBe(false); // and its history is intact
+		await page.keyboard.press('Escape'); // abandon the typing
+		await page.keyboard.press('Control+z');
+		expect(await field('Quantity 2').inputValue()).toBe('1'); // now the shortcut is the editor's again
+	});
+});

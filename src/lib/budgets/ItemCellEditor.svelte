@@ -65,6 +65,10 @@
 		else if (event.key === 'Enter') event.preventDefault(); // Enter never submits anything
 	}
 
+	// True while the input holds text that has not been committed: then the browser's own text undo
+	// owns Ctrl/Cmd+Z, and the editor-wide Item undo must not take it.
+	const dirty = $derived(buffer !== value);
+
 	const numeric = $derived(field === 'quantity' || field === 'unitPrice');
 </script>
 
@@ -73,7 +77,7 @@
 	previous editable cell, Escape abandons the edit and restores the committed value. A rejected
 	commit keeps the cursor here with its message showing. Other keys, arrows included, just edit text.
 -->
-<div class="editor" role="presentation" onkeydown={handleKey}>
+<div class="editor" role="presentation" data-dirty={dirty ? '' : undefined} onkeydown={handleKey}>
 	{#if numeric}
 		<NumberInput
 			{label}

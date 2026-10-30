@@ -1486,3 +1486,289 @@ describe('keyboard navigation and editing', () => {
 		});
 	});
 });
+
+describe('undo and redo shortcuts', () => {
+	/** Item 1 (group x2) > [Item 2 (group x3) > [Item 3 10, Item 4 5 x2], Item 5 7], Item 6 100  =>  total 234 */
+	const tree = () => [...nested(), item(6, null, '100')];
+
+	function editor(items: Item[] = tree()) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const undo = (modifier: 'Control' | 'Meta' = 'Control') => userEvent.keyboard(`{${modifier}>}z{/${modifier}}`);
+	const redo = (modifier: 'Control' | 'Meta' = 'Control') => userEvent.keyboard(`{${modifier}>}{Shift>}z{/Shift}{/${modifier}}`);
+	const codes = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-code'));
+	const rowIds = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-item-id'));
+	const grandTotal = () => page.getByLabelText('Grand total');
+	const cell = (code: string, column: string) =>
+		document.querySelector<HTMLElement>(`tr[data-code="${code}"] td[data-cell$="|${column}"]`)!;
+	const itemOf = (store: BudgetStore, n: number) => store.itemsOf(BUDGET).find((i) => i.id === uuid(n))!;
+
+	/** Commit an edit through the keyboard-free path the user would use, leaving focus on the page. */
+	async function commit(label: string, text: string) {
+		await page.getByLabelText(label, { exact: true }).fill(text);
+		await userEvent.keyboard('{Enter}');
+		(document.activeElement as HTMLElement).blur();
+	}
+
+	describe('with either platform modifier', () => {
+		it('Ctrl+Z undoes and Ctrl+Shift+Z redoes a committed cell edit, updating Codes and totals at once', async () => {
+			const store = editor();
+			await commit('Unit price 1.1.1', '20');
+			await expect.element(grandTotal()).toHaveTextContent('€294.00');
+
+			await undo('Control');
+			expect(itemOf(store, 3).unitPrice).toBe('10');
+			await expect.element(grandTotal()).toHaveTextContent('€234.00');
+			await expect.element(page.getByLabelText('Unit price 1.1.1', { exact: true })).toHaveValue('10');
+
+			await redo('Control');
+			expect(itemOf(store, 3).unitPrice).toBe('20');
+			await expect.element(grandTotal()).toHaveTextContent('€294.00');
+		});
+
+		it('Cmd+Z and Cmd+Shift+Z do the same', async () => {
+			const store = editor();
+			await commit('Quantity 1.1', '4');
+			await expect.element(grandTotal()).toHaveTextContent('€274.00'); // 2 x (4 x 20 + 7) + 100 = 174 + 100
+			await undo('Meta');
+			expect(itemOf(store, 2).quantity).toBe('3');
+			await redo('Meta');
+			expect(itemOf(store, 2).quantity).toBe('4');
+		});
+
+		it('works through several steps, in order', async () => {
+			const store = editor();
+			await commit('Description 1.1.1', 'First');
+			await commit('Description 1.1.1', 'Second');
+			await commit('Description 1.1.1', 'Third');
+			await undo('Control');
+			await undo('Meta');
+			expect(itemOf(store, 3).description).toBe('First');
+			await redo('Meta');
+			await redo('Control');
+			expect(itemOf(store, 3).description).toBe('Third');
+		});
+
+		it('behaves exactly like the Undo and Redo buttons', async () => {
+			const store = editor();
+			await commit('Quantity 1.1.1', '2');
+			await page.getByRole('button', { name: 'Undo' }).click();
+			const viaButton = store.itemsOf(BUDGET);
+			await page.getByRole('button', { name: 'Redo' }).click();
+			await undo('Control');
+			expect(store.itemsOf(BUDGET)).toEqual(viaButton);
+		});
+
+		it('tells assistive technology about the shortcuts on the buttons', async () => {
+			editor();
+			await expect.element(page.getByRole('button', { name: 'Undo' })).toHaveAttribute('aria-keyshortcuts', 'Control+Z Meta+Z');
+			await expect.element(page.getByRole('button', { name: 'Redo' })).toHaveAttribute('aria-keyshortcuts', 'Control+Shift+Z Meta+Shift+Z');
+		});
+	});
+
+	describe('across the feature commands', () => {
+		it('undoes and redoes adding an Item', async () => {
+			const store = editor();
+			const before = rowIds();
+			await page.getByRole('button', { name: 'Add item', exact: true }).click();
+			(document.activeElement as HTMLElement).blur();
+			const after = rowIds();
+			expect(after).toHaveLength(before.length + 1);
+
+			await undo();
+			expect(rowIds()).toEqual(before);
+			await redo();
+			expect(rowIds()).toEqual(after); // the same identities, in the same order
+			expect(store.itemsOf(BUDGET)).toHaveLength(7);
+		});
+
+		it('undoes adding a child with its Line-to-Group conversion in one step, and redoes it', async () => {
+			const store = editor([item(1, null, '-250.5', '3'), item(2, null, '7')]);
+			const before = rowIds();
+			await page.getByRole('button', { name: 'Add child to 1', exact: true }).click();
+			await page.getByRole('button', { name: 'Convert and add item' }).click();
+			(document.activeElement as HTMLElement).blur();
+			const after = rowIds();
+			expect(itemOf(store, 1).unitPrice).toBe('0'); // converted: manual price replaced
+			expect(after).toHaveLength(3);
+
+			await undo('Meta');
+			expect(rowIds()).toEqual(before);
+			expect(itemOf(store, 1)).toMatchObject({ unitPrice: '-250.5', quantity: '3' }); // manual price and Quantity back
+			await expect.element(page.getByLabelText('Unit price 1', { exact: true })).toHaveValue('-250.5');
+			expect(store.canUndo(BUDGET)).toBe(false); // a single command
+
+			await redo('Meta');
+			expect(rowIds()).toEqual(after);
+			expect(itemOf(store, 1).unitPrice).toBe('0');
+		});
+
+		it('undoes and redoes a subtree deletion, restoring every identity and the parent pricing', async () => {
+			const store = editor([item(1, null, '999', '2'), item(2, 1, '0', '3'), item(3, 2, '10'), item(4, 2, '5', '2')]);
+			const before = rowIds();
+			const original = store.itemsOf(BUDGET);
+			await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+			await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+			(document.activeElement as HTMLElement).blur();
+			expect(rowIds()).toEqual([uuid(1)]);
+			expect(itemOf(store, 1).unitPrice).toBe('0'); // the childless parent was normalized
+
+			await undo();
+			expect(rowIds()).toEqual(before);
+			expect(store.itemsOf(BUDGET)).toEqual(original);
+			expect(itemOf(store, 1).unitPrice).toBe('999'); // original parent pricing
+
+			await redo();
+			expect(rowIds()).toEqual([uuid(1)]);
+		});
+
+		it('restores focus to a sensible cell when undo removes the row it was on', async () => {
+			editor();
+			await page.getByRole('button', { name: 'Add item', exact: true }).click();
+			const added = rowIds().at(-1)!;
+			cell(codes().at(-1)!, 'quantity').focus();
+			await undo();
+			expect(rowIds()).not.toContain(added);
+			await expect.poll(() => document.activeElement?.closest('[data-cell]')?.closest('tr')?.getAttribute('data-code')).toBe('2');
+		});
+	});
+
+	describe('typing keeps the browser undo', () => {
+		it('leaves Ctrl/Cmd+Z alone while a cell has uncommitted text, and records nothing', async () => {
+			const store = editor();
+			await commit('Quantity 1.1.1', '5'); // one real command to protect
+			const items = store.items;
+			await page.getByLabelText('Description 1.1.1', { exact: true }).fill('half typed');
+
+			for (const modifier of ['ctrlKey', 'metaKey'] as const) {
+				for (const shiftKey of [false, true]) {
+					const event = new KeyboardEvent('keydown', { key: shiftKey ? 'Z' : 'z', [modifier]: true, shiftKey, bubbles: true, cancelable: true });
+					document.activeElement!.dispatchEvent(event);
+					expect(event.defaultPrevented, `${modifier} shift=${shiftKey}`).toBe(false); // the browser still gets it
+				}
+			}
+			expect(store.items).toBe(items); // no Item command ran
+			expect(itemOf(store, 3).quantity).toBe('5'); // the earlier command was not undone
+			expect((document.activeElement as HTMLInputElement).value).toBe('half typed');
+		});
+
+		it('makes no accidental Item command from text editing', async () => {
+			const store = editor();
+			await page.getByLabelText('Description 1.1.1', { exact: true }).fill('typing');
+			await userEvent.keyboard('{Control>}z{/Control}');
+			await userEvent.keyboard('{Meta>}z{/Meta}');
+			expect(store.canUndo(BUDGET)).toBe(false);
+			expect(store.canRedo(BUDGET)).toBe(false);
+		});
+
+		it('takes the shortcut again once the text is committed or abandoned', async () => {
+			const store = editor();
+			await commit('Quantity 1.1.1', '5');
+			await page.getByLabelText('Description 1.1.1', { exact: true }).fill('abandon me');
+			await userEvent.keyboard('{Escape}'); // nothing uncommitted any more
+			await undo();
+			expect(itemOf(store, 3).quantity).toBe('1');
+		});
+
+		it('hands over from a focused cell input with nothing typed', async () => {
+			const store = editor();
+			await commit('Quantity 1.1.1', '5');
+			cell('1.1.1', 'quantity').focus();
+			await userEvent.keyboard('{Enter}'); // editing, but unchanged text
+			expect(document.activeElement?.tagName).toBe('INPUT');
+			const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+			document.activeElement!.dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(true);
+			expect(itemOf(store, 3).quantity).toBe('1');
+		});
+
+		it('does not undo on a plain z, with Alt, or with both modifiers', async () => {
+			const store = editor();
+			await commit('Quantity 1.1.1', '5');
+			cell('1.1.1', 'code').focus();
+			await userEvent.keyboard('z');
+			await userEvent.keyboard('{Control>}{Alt>}z{/Alt}{/Control}');
+			await userEvent.keyboard('{Control>}{Meta>}z{/Meta}{/Control}');
+			expect(itemOf(store, 3).quantity).toBe('5');
+		});
+
+		it('leaves a dialog field to the browser, and does not undo behind an open dialog', async () => {
+			const store = editor();
+			await commit('Quantity 1.1.1', '5');
+			await page.getByRole('button', { name: 'Rename' }).click();
+			await page.getByLabelText('Name', { exact: true }).fill('Typed in the dialog');
+			const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+			document.activeElement!.dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(false);
+			expect(itemOf(store, 3).quantity).toBe('5');
+
+			await page.getByRole('button', { name: 'Cancel' }).click();
+			await undo();
+			expect(itemOf(store, 3).quantity).toBe('1'); // normal again once the dialog is closed
+		});
+	});
+
+	describe('empty stacks, invalidation and isolation', () => {
+		it('does nothing, harmlessly, when there is nothing to undo or redo', async () => {
+			const store = editor();
+			const items = store.items;
+			const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+			document.body.dispatchEvent(event);
+			await undo();
+			await redo();
+			expect(store.items).toBe(items);
+			expect(store.canUndo(BUDGET)).toBe(false);
+			expect(store.canRedo(BUDGET)).toBe(false);
+		});
+
+		it('redo is gone after a new commit following an undo', async () => {
+			const store = editor();
+			await commit('Quantity 1.1.1', '2');
+			await undo();
+			expect(store.canRedo(BUDGET)).toBe(true);
+			await commit('Quantity 1.1.1', '3');
+			expect(store.canRedo(BUDGET)).toBe(false);
+			await redo();
+			expect(itemOf(store, 3).quantity).toBe('3'); // nothing was redone
+			await expect.element(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
+		});
+
+		it('only touches the Budget that is open, leaving the other history alone', async () => {
+			const A = BUDGET;
+			const B = '22222222-2222-4222-8222-222222222222';
+			const store = new BudgetStore({ history: new CommandHistory() });
+			store.hydrate();
+			store.setBudget(createBudget({ id: A, name: 'A', currency: 'EUR' }), [item(1, null, '1')]);
+			store.setBudget(createBudget({ id: B, name: 'B', currency: 'EUR' }), [
+				createItem({ id: uuid(901), budgetId: B, sortIndex: 0, description: 'B item', unitPrice: '2' })
+			]);
+			store.select(A);
+			const view = render(BudgetEditorPage, { budgetId: A, store });
+			await commit('Quantity 1', '7');
+			expect(store.canUndo(A)).toBe(true);
+
+			await view.rerender({ budgetId: B, store });
+			await expect.element(page.getByRole('heading', { name: 'B', exact: true })).toBeVisible();
+			await undo(); // B has no history of its own
+			expect(store.canUndo(A)).toBe(true);
+			expect(store.itemsOf(A)[0].quantity).toBe('7'); // A untouched by B's undo
+
+			await view.rerender({ budgetId: A, store });
+			await expect.element(page.getByRole('heading', { name: 'A', exact: true })).toBeVisible();
+			await undo();
+			expect(store.itemsOf(A)[0].quantity).toBe('1');
+			expect(store.canUndo(A)).toBe(false);
+		});
+
+		it('is only active in the editor: nothing happens once it is closed', async () => {
+			const store = openStore(tree());
+			const view = render(BudgetEditorPage, { budgetId: BUDGET, store });
+			await commit('Quantity 1.1.1', '5');
+			view.unmount();
+			await undo();
+			expect(itemOf(store, 3).quantity).toBe('5');
+		});
+	});
+});
