@@ -145,14 +145,14 @@ describe('RenameBudgetDialog', () => {
 	it('does not alter Items, their order, the totals or the Item history', async () => {
 		const store = open();
 		const rowsBefore = [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-item-id'));
-		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('107 EUR');
+		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('€107.00');
 
 		await renameButton().click();
 		await nameField().fill('Renamed');
 		await page.getByRole('button', { name: 'Save' }).click();
 
 		expect([...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-item-id'))).toEqual(rowsBefore);
-		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('107 EUR');
+		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('€107.00');
 		expect(store.canUndo(BUDGET)).toBe(false);
 		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
 	});

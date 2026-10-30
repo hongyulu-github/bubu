@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { canEditField, type EditResult, type EditableField } from '../budget/edit';
+	import { formatMoney } from '../budget/currency';
 	import { toString } from '../budget/numbers';
 	import Button from '../components/Button.svelte';
 	import TableCell from '../components/TableCell.svelte';
@@ -8,6 +9,8 @@
 
 	interface Props {
 		rows: readonly BudgetRow[];
+		/** The Budget currency: monetary cells are shown in it, rounded to its minor units for display only. */
+		currency: string;
 		/**
 		 * Commit an edit. When omitted the table is read-only. Which cells are editable at all is
 		 * decided here (see `canEditField`), not by the caller.
@@ -21,14 +24,15 @@
 		onaddchild?: (parentId: string) => void;
 	}
 
-	let { rows, onedit, onadd, ondelete, onaddchild }: Props = $props();
+	let { rows, currency, onedit, onadd, ondelete, onaddchild }: Props = $props();
 	const hasActions = $derived(onadd !== undefined || ondelete !== undefined || onaddchild !== undefined);
 </script>
 
 <!--
 	The derived rows. Code, Total and a Group's Unit price are computed, so their cells are marked
-	read-only and hold no controls; the other cells are inputs when `onedit` is given. Amounts are
-	shown as plain decimals; currency formatting is a separate adapter.
+	read-only and hold no controls; the other cells are inputs when `onedit` is given. Read-only money
+	is formatted in the Budget currency for display; inputs keep the exact value, and nothing here
+	rounds what is stored or calculated.
 -->
 {#snippet editor(row: BudgetRow, field: EditableField, column: string, value: string)}
 	{#if canEditField(row.kind, field)}
@@ -95,10 +99,10 @@
 						{#if onedit && !group}
 							{@render editor(row, 'unitPrice', 'Unit price', row.item.unitPrice)}
 						{:else}
-							{toString(row.amounts.unitPrice)}
+							{formatMoney(row.amounts.unitPrice, currency)}
 						{/if}
 					</TableCell>
-					<TableCell numeric readonly strong>{toString(row.amounts.total)}</TableCell>
+					<TableCell numeric readonly strong>{formatMoney(row.amounts.total, currency)}</TableCell>
 					{#if hasActions}
 						<TableCell>
 							<div class="actions">

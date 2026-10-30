@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import { describeConversion, type ConversionImpact } from '../budget/convert';
 	import { describeDeletion, type DeletionImpact } from '../budget/delete';
-	import { toString } from '../budget/numbers';
+	import { formatMoney } from '../budget/currency';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import Button from '../components/Button.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
@@ -116,7 +116,7 @@
 			{#if ready}
 				<p class="total">
 					<span class="total-label">Grand total</span>
-					<output aria-label="Grand total">{toString(store.grandTotal)} {budget.currency}</output>
+					<output aria-label="Grand total">{formatMoney(store.grandTotal, budget.currency)}</output>
 				</p>
 			{/if}
 		</header>
@@ -137,6 +137,7 @@
 		{:else if rows.length > 0}
 			<BudgetSpreadsheet
 				{rows}
+				currency={budget.currency}
 				onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
 				onadd={addBelow}
 				ondelete={requestDelete}

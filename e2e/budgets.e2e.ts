@@ -191,13 +191,13 @@ describe('Editing cells (built static site)', () => {
 	it('commits edits, refreshes the totals, validates input, and undoes', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
 		await page.getByLabel('Unit price 1.1', { exact: true }).waitFor();
-		expect(await total()).toBe('0 EUR');
+		expect(await total()).toBe('€0.00');
 
 		await page.getByLabel('Unit price 1.1', { exact: true }).fill('-100');
 		await page.keyboard.press('Enter');
 		await page.getByLabel('Quantity 1.1', { exact: true }).fill('2.5');
 		await page.keyboard.press('Enter');
-		await expect.poll(total).toBe('-250.0 EUR'); // -100 x 2.5, rolled up through the Group
+		await expect.poll(total).toBe('-€250.00'); // -100 x 2.5, rolled up through the Group
 
 		// A Group's own Unit price is calculated, so it has no input.
 		expect(await page.getByLabel('Unit price 1', { exact: true }).count()).toBe(0);
@@ -206,14 +206,14 @@ describe('Editing cells (built static site)', () => {
 		await page.getByLabel('Quantity 1.1', { exact: true }).fill('abc');
 		await page.keyboard.press('Enter');
 		await page.getByText('Enter a valid number.').waitFor();
-		expect(await total()).toBe('-250.0 EUR');
+		expect(await total()).toBe('-€250.00');
 		await page.keyboard.press('Escape');
 		expect(await page.getByLabel('Quantity 1.1', { exact: true }).inputValue()).toBe('2.5');
 
 		await page.getByRole('button', { name: 'Undo' }).click();
 		expect(await page.getByLabel('Quantity 1.1', { exact: true }).inputValue()).toBe('1');
 		await page.getByRole('button', { name: 'Undo' }).click();
-		await expect.poll(total).toBe('0 EUR');
+		await expect.poll(total).toBe('€0.00');
 		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(true);
 		await page.getByRole('button', { name: 'Redo' }).click();
 		expect(await page.getByLabel('Unit price 1.1', { exact: true }).inputValue()).toBe('-100');
@@ -244,13 +244,13 @@ describe('Building a Budget from nothing (built static site)', () => {
 		await page.getByLabel('Unit price 2', { exact: true }).fill('-250.5');
 		await page.keyboard.press('Enter');
 
-		await expect.poll(total).toBe('999.0 EUR'); // 1500 + (-250.5 x 2)
+		await expect.poll(total).toBe('€999.00'); // 1500 + (-250.5 x 2)
 		expect(await page.locator('tbody tr').count()).toBe(2);
 
 		await page.getByRole('button', { name: 'Add item below 1' }).click(); // inserted between the two
 		const descriptions = () => page.locator('tbody tr').evaluateAll((rows) => rows.map((r) => r.querySelector('input')?.value));
 		await expect.poll(descriptions).toEqual(['Venue', '', 'Catering']);
-		expect(await total()).toBe('999.0 EUR');
+		expect(await total()).toBe('€999.00');
 
 		await page.getByRole('button', { name: 'Undo' }).click();
 		await expect.poll(descriptions).toEqual(['Venue', 'Catering']);
@@ -370,7 +370,7 @@ describe('Adding child Items (built static site)', () => {
 		await page.keyboard.press('Enter');
 		await page.getByLabel('Quantity 2', { exact: true }).fill('3');
 		await page.keyboard.press('Enter');
-		await expect.poll(total).toBe('-751.5 EUR');
+		await expect.poll(total).toBe('-€751.50');
 
 		// Cancel: nothing changes.
 		await page.getByRole('button', { name: 'Add child to 2', exact: true }).click();
@@ -384,10 +384,10 @@ describe('Adding child Items (built static site)', () => {
 		await page.getByLabel('Description 2.1', { exact: true }).waitFor();
 		expect(await page.getByLabel('Quantity 2', { exact: true }).inputValue()).toBe('3');
 		expect(await page.getByLabel('Unit price 2', { exact: true }).count()).toBe(0);
-		await expect.poll(total).toBe('0 EUR');
+		await expect.poll(total).toBe('€0.00');
 
 		await page.getByRole('button', { name: 'Undo' }).click();
-		await expect.poll(total).toBe('-751.5 EUR');
+		await expect.poll(total).toBe('-€751.50');
 		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('-250.5');
 		expect(await page.getByLabel('Description 2.1', { exact: true }).count()).toBe(0);
 	});
@@ -492,7 +492,7 @@ describe('Everything is saved automatically (built static site)', () => {
 		await page.getByLabel('Unit price 2', { exact: true }).waitFor();
 		await page.getByLabel('Unit price 2', { exact: true }).fill('99');
 		await page.keyboard.press('Enter');
-		await expect.poll(total).toBe('99 EUR');
+		await expect.poll(total).toBe('€99.00');
 		await page.reload();
 		await page.getByLabel('Unit price 2', { exact: true }).waitFor();
 		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('99');
@@ -504,7 +504,7 @@ describe('Everything is saved automatically (built static site)', () => {
 		await page.getByLabel('Unit price 2', { exact: true }).fill('5');
 		await page.keyboard.press('Enter');
 		await page.getByRole('button', { name: 'Undo' }).click();
-		await expect.poll(total).toBe('99 EUR');
+		await expect.poll(total).toBe('€99.00');
 		await page.reload();
 		await page.getByLabel('Unit price 2', { exact: true }).waitFor();
 		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('99');
