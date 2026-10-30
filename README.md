@@ -32,6 +32,8 @@ Tests: `*.spec.ts` run in Node; `*.svelte.spec.ts` run in a real browser via `vi
 
 Design tokens and base components (`Button`, `Input`, `NumberInput`, `Dialog`, `TableCell`) are documented in [docs/design-foundation.md](docs/design-foundation.md), including source and license. Run `npm run dev` and open `/design` for a live preview.
 
+A tree drag-and-drop prototype lives at `/prototypes/tree-dnd`; integration notes are in [docs/pragmatic-tree-dnd.md](docs/pragmatic-tree-dnd.md).
+
 ## Version-control workflow
 
 Clone:

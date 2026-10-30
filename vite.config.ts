@@ -4,6 +4,11 @@ import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
+	ssr: {
+		// Atlaskit's Pragmatic packages expose subpaths as directories (no `exports` map), which Node's
+		// ESM loader cannot resolve while prerendering. Let Vite bundle them for SSR instead.
+		noExternal: ['@atlaskit/pragmatic-drag-and-drop', '@atlaskit/pragmatic-drag-and-drop-hitbox']
+	},
 	plugins: [
 		sveltekit({
 			compilerOptions: {

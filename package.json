@@ -29,5 +29,9 @@
 	"imports": {
 		"#lib": "./src/lib/index.js",
 		"#lib/*": "./src/lib/*"
+	},
+	"dependencies": {
+		"@atlaskit/pragmatic-drag-and-drop": "^4.0.0",
+		"@atlaskit/pragmatic-drag-and-drop-hitbox": "^3.0.0"
 	}
 }
