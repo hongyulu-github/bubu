@@ -58,7 +58,12 @@ afterEach(async () => {
 	await page.context().close();
 });
 
-const items = () => page.locator('ol[aria-label="Items"] li').allInnerTexts().then((rows) => rows.map((row) => row.replace(/\s+/g, ' ').trim()));
+const items = () =>
+	page.locator('table[aria-label="Budget Items"] tbody tr').evaluateAll((rows) =>
+		rows.map((row) =>
+			[...row.querySelectorAll('td')].slice(0, 2).map((cell) => cell.textContent?.trim()).join(' ')
+		)
+	);
 
 describe('Budgets list and editor routes (built static site)', () => {
 	it('lists both saved Budgets and opens the matching editor, with back navigation', async () => {
@@ -148,7 +153,7 @@ describe('Creating a Budget (built static site)', () => {
 		expect(page.url()).toMatch(new RegExp(`^${baseUrl}/budgets/[0-9a-f-]{36}$`));
 		expect(await page.locator('main').innerText()).toContain('DKK');
 		await page.getByText('This Budget has no Items yet.').waitFor();
-		expect(await page.locator('ol[aria-label="Items"]').count()).toBe(0);
+		expect(await page.locator('table[aria-label="Budget Items"]').count()).toBe(0);
 
 		// The new Budget is in shared state, so the list shows it next to the saved ones.
 		await page.getByRole('link', { name: /All Budgets/ }).click();

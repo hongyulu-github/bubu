@@ -35,6 +35,12 @@ function seed() {
 	bubuStorage.writeItems(B, [item(B, 1, null, 'Paint'), item(B, 2, null, 'Flooring')]);
 }
 
+/** Code and Description of every row in the Budget table, e.g. "1.1 Hall rental". */
+const outline = () =>
+	[...document.querySelectorAll('table[aria-label="Budget Items"] tbody tr')].map((row) =>
+		[...row.querySelectorAll('td')].slice(0, 2).map((cell) => cell.textContent?.trim()).join(' ')
+	);
+
 const newStore = (hydrate = true) => {
 	const store = new BudgetStore({ history: new CommandHistory() });
 	if (hydrate) store.hydrate();
@@ -115,8 +121,8 @@ describe('BudgetEditorPage', () => {
 		render(BudgetEditorPage, { budgetId: A, store: newStore() });
 
 		await expect.element(page.getByRole('heading', { name: 'Wedding' })).toBeVisible();
-		await expect.element(page.getByText('EUR')).toBeVisible();
-		const items = [...document.querySelectorAll('ol[aria-label="Items"] li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+		await expect.element(page.getByText('EUR', { exact: true })).toBeVisible();
+		const items = outline();
 		expect(items).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
 		expect(document.body.textContent).not.toContain('Paint');
 	});
@@ -129,7 +135,7 @@ describe('BudgetEditorPage', () => {
 
 		await view.rerender({ budgetId: B, store });
 		await expect.element(page.getByRole('heading', { name: 'Renovation' })).toBeVisible();
-		const items = [...document.querySelectorAll('ol[aria-label="Items"] li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+		const items = outline();
 		expect(items).toEqual(['1 Paint', '2 Flooring']);
 		expect(store.activeBudgetId).toBe(B);
 	});

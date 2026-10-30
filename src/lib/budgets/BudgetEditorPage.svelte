@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { toString } from '../budget/numbers';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
+	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
 
 	let { budgetId, store = budgetStore }: { budgetId: string; store?: BudgetStore } = $props();
 
@@ -16,7 +18,8 @@
 
 	// Only show Items once the store has switched to this route's Budget, so a previously open
 	// Budget's Items can never flash up under the wrong heading.
-	const rows = $derived(store.activeBudgetId === budgetId ? store.rows : []);
+	const ready = $derived(store.activeBudgetId === budgetId);
+	const rows = $derived(ready ? store.rows : []);
 </script>
 
 <main>
@@ -27,20 +30,23 @@
 	{:else if store.hydrationStatus === 'unavailable'}
 		<p class="note" role="alert">Browser storage is not available, so this Budget cannot be opened.</p>
 	{:else if budget}
-		<h1>{budget.name}</h1>
-		<p class="meta">{budget.currency}</p>
+		<header>
+			<div>
+				<h1>{budget.name}</h1>
+				<p class="meta">{budget.currency}</p>
+			</div>
+			{#if ready}
+				<p class="total">
+					<span class="total-label">Grand total</span>
+					<output aria-label="Grand total">{toString(store.grandTotal)} {budget.currency}</output>
+				</p>
+			{/if}
+		</header>
 
-		{#if rows.length === 0}
+		{#if ready && rows.length === 0}
 			<p class="note">This Budget has no Items yet.</p>
-		{:else}
-			<ol aria-label="Items">
-				{#each rows as row (row.id)}
-					<li style:--depth={row.depth}>
-						<span class="code">{row.code}</span>
-						<span>{row.item.description}</span>
-					</li>
-				{/each}
-			</ol>
+		{:else if rows.length > 0}
+			<BudgetSpreadsheet {rows} />
 		{/if}
 	{:else if loadFailure}
 		<h1>This Budget could not be loaded</h1>
@@ -53,7 +59,7 @@
 
 <style>
 	main {
-		max-width: 40rem;
+		max-width: 64rem;
 		margin: 0 auto;
 		padding: var(--space-6) var(--space-4);
 		display: flex;
@@ -86,29 +92,29 @@
 		color: var(--color-text-secondary);
 	}
 
-	ol {
-		list-style: none;
-		margin: var(--space-3) 0 0;
-		padding: 0;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-	}
-
-	li {
+	header {
 		display: flex;
-		gap: var(--space-3);
-		padding: var(--space-3) var(--space-4) var(--space-3) calc(var(--space-4) + var(--depth) * var(--space-5));
-		border-bottom: 1px solid var(--color-border);
+		flex-wrap: wrap;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: var(--space-4);
+		margin-bottom: var(--space-3);
 	}
 
-	li:last-child {
-		border-bottom: none;
+	.total {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
 	}
 
-	.code {
-		min-width: 3.5rem;
+	.total-label {
 		color: var(--color-text-secondary);
+		font-size: var(--font-size-footnote);
+	}
+
+	output {
+		font-size: var(--font-size-title);
+		font-weight: var(--font-weight-semibold);
 		font-variant-numeric: tabular-nums;
 	}
 </style>

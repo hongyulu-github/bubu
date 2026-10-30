@@ -3,9 +3,32 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
 import { contrastRatio, focusDocument, resetTheme, setTheme, type Theme } from '../testing/theme';
+import ReadonlyHost from './__fixtures__/ReadonlyHost.svelte';
 import TableHost from './__fixtures__/TableHost.svelte';
 
 afterEach(resetTheme);
+
+describe('TableCell read-only, strong and depth', () => {
+	it('tints read-only cells and flags them, leaving editable cells untinted', async () => {
+		render(ReadonlyHost);
+		const cells = [...document.querySelectorAll('td')];
+		const [editable, readonly] = cells;
+		expect(readonly.hasAttribute('data-readonly')).toBe(true);
+		expect(editable.hasAttribute('data-readonly')).toBe(false);
+		expect(getComputedStyle(editable).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+		expect(getComputedStyle(readonly).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+		expect(readonly.querySelector('input, button, select, textarea')).toBeNull();
+	});
+
+	it('makes strong cells heavier and indents by depth up to a maximum', async () => {
+		render(ReadonlyHost);
+		const [plain, , strongCell, shallow, deep, deeper] = [...document.querySelectorAll('td')];
+		expect(parseInt(getComputedStyle(strongCell).fontWeight)).toBeGreaterThan(parseInt(getComputedStyle(plain).fontWeight));
+		const indent = (cell: Element) => parseFloat(getComputedStyle(cell).paddingInlineStart);
+		expect(indent(deep)).toBeGreaterThan(indent(shallow));
+		expect(indent(deeper)).toBe(indent(deep)); // depth 40 is indented no further than depth 20
+	});
+});
 
 describe('TableCell', () => {
 	it('renders headers and data cells with table semantics', async () => {
