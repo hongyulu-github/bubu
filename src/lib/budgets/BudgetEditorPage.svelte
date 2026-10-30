@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { toString } from '../budget/numbers';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import Button from '../components/Button.svelte';
@@ -20,6 +21,22 @@
 	// Only show Items once the store has switched to this route's Budget, so a previously open
 	// Budget's Items can never flash up under the wrong heading.
 	const ready = $derived(store.activeBudgetId === budgetId);
+
+	/** Move the cursor to the new row's Description so the user can type straight away. */
+	async function focusDescription(itemId: string) {
+		await tick();
+		document.querySelector<HTMLInputElement>(`tr[data-item-id="${itemId}"] input`)?.focus();
+	}
+
+	async function addTopLevel() {
+		const added = store.addTopLevelItem(budgetId);
+		if (added.ok) await focusDescription(added.item.id);
+	}
+
+	async function addBelow(siblingId: string) {
+		const added = store.addSiblingItem(budgetId, siblingId);
+		if (added.ok) await focusDescription(added.item.id);
+	}
 	const rows = $derived(ready ? store.rows : []);
 </script>
 
@@ -54,7 +71,17 @@
 		{#if ready && rows.length === 0}
 			<p class="note">This Budget has no Items yet.</p>
 		{:else if rows.length > 0}
-			<BudgetSpreadsheet {rows} onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)} />
+			<BudgetSpreadsheet
+				{rows}
+				onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
+				onadd={addBelow}
+			/>
+		{/if}
+
+		{#if ready}
+			<div class="add">
+				<Button variant="primary" onclick={addTopLevel}>Add item</Button>
+			</div>
 		{/if}
 	{:else if loadFailure}
 		<h1>This Budget could not be loaded</h1>
@@ -107,6 +134,11 @@
 		justify-content: space-between;
 		gap: var(--space-4);
 		margin-bottom: var(--space-3);
+	}
+
+	.add {
+		display: flex;
+		margin-top: var(--space-2);
 	}
 
 	.history {

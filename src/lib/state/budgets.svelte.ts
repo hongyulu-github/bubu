@@ -1,5 +1,6 @@
 import { calculateTotals, type ItemAmounts } from '../budget/calculate';
 import { applyFieldEdit, type EditResult, type EditableField } from '../budget/edit';
+import { insertSiblingItem, insertTopLevelItem, type InsertResult, type NewItemFields } from '../budget/insert';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
 import type { Budget, Item, ItemKind, Uuid } from '../budget/model';
 import { buildItemTree } from '../budget/tree';
@@ -37,6 +38,10 @@ export interface LoadIssue {
 export type MutationResult =
 	| { ok: true }
 	| { ok: false; reason: 'unknown-budget' | 'invalid'; issues: ValidationIssue[] };
+
+export type AddItemResult =
+	| { ok: true; item: Item }
+	| { ok: false; reason: 'unknown-budget' | 'unknown-item' | 'invalid' };
 
 export type HydrationStatus = 'idle' | 'ready' | 'unavailable';
 
@@ -208,6 +213,24 @@ export class BudgetStore {
 		const committed = this.execute(budgetId, edit.items);
 		if (!committed.ok) return { ok: false, reason: 'invalid', message: committed.issues[0]?.message ?? 'The edit is not valid.' };
 		return edit;
+	}
+
+	/** Add a top-level Item as one undoable command. Returns the new Item, or why nothing was added. */
+	addTopLevelItem(budgetId: Uuid, fields?: NewItemFields): AddItemResult {
+		if (!this.budgets.some((budget) => budget.id === budgetId)) return { ok: false, reason: 'unknown-budget' };
+		return this.#commitInsert(budgetId, insertTopLevelItem(this.itemsOf(budgetId), budgetId, fields));
+	}
+
+	/** Add an Item directly after a sibling, under the same parent, as one undoable command. */
+	addSiblingItem(budgetId: Uuid, siblingId: Uuid, fields?: NewItemFields): AddItemResult {
+		if (!this.budgets.some((budget) => budget.id === budgetId)) return { ok: false, reason: 'unknown-budget' };
+		return this.#commitInsert(budgetId, insertSiblingItem(this.itemsOf(budgetId), siblingId, fields));
+	}
+
+	#commitInsert(budgetId: Uuid, inserted: InsertResult): AddItemResult {
+		if (!inserted.ok) return inserted;
+		const committed = this.execute(budgetId, inserted.items);
+		return committed.ok ? { ok: true, item: inserted.item } : { ok: false, reason: 'invalid' };
 	}
 
 	/** Undo the Budget's last command. Returns false when there is nothing to undo. */

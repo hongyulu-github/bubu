@@ -48,7 +48,7 @@ afterEach(() => {
 const cellText = (cell: Element) => cell.querySelector('input')?.value ?? cell.textContent?.trim() ?? '';
 const table = () =>
 	[...document.querySelectorAll('table[aria-label="Budget Items"] tbody tr')].map((row) =>
-		[...row.querySelectorAll('td')].map(cellText)
+		[...row.querySelectorAll('td')].slice(0, 6).map(cellText) // the six data columns; row actions come after
 	);
 
 // Outer (x2) = Inner (x3) of [10 x1, 5 x2] + Line 7.   Inner: unit 20, total 60.   Outer: unit 67, total 134.
@@ -352,5 +352,100 @@ describe('inline editing', () => {
 		await field('Unit', '1').fill('lot');
 		await userEvent.keyboard('{Enter}');
 		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+	});
+});
+
+describe('adding Items', () => {
+	function editor(items: Item[]) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const rowIds = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-item-id'));
+	const codes = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-code'));
+	const grandTotal = () => page.getByLabelText('Grand total');
+
+	it('adds the first Item to an empty Budget with the defaults and focuses its Description', async () => {
+		editor([]);
+		await expect.element(page.getByText('This Budget has no Items yet.')).toBeVisible();
+		await expect.element(grandTotal()).toHaveTextContent('0 EUR');
+
+		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+
+		await expect.element(page.getByRole('table', { name: 'Budget Items' })).toBeVisible();
+		expect(codes()).toEqual(['1']);
+		expect(table()).toEqual([['1', '', '1', '', '0', '0']]); // empty Description, Quantity 1, Unit price 0, Total 0
+		await expect.element(page.getByLabelText('Description 1', { exact: true })).toHaveFocus();
+		await expect.element(grandTotal()).toHaveTextContent('0 EUR');
+		expect(document.body.textContent).not.toContain('This Budget has no Items yet.');
+	});
+
+	it('adds top-level Items one after another in insertion order', async () => {
+		editor(nested());
+		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2', '3']);
+		await expect.element(grandTotal()).toHaveTextContent('134 EUR');
+	});
+
+	it('adds a sibling directly below a nested row, with the Codes below it renumbered at once', async () => {
+		editor(nested());
+		await page.getByRole('button', { name: 'Add item below 1.1.1' }).click();
+
+		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.1.3', '1.2']);
+		const kinds = [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-kind'));
+		expect(kinds).toEqual(['group', 'group', 'line', 'line', 'line', 'line']);
+		expect(table()[3]).toEqual(['1.1.2', '', '1', '', '0', '0']); // the new Item
+		expect(table()[4][1]).toBe('Item 4'); // the old 1.1.2 moved down to 1.1.3
+		await expect.element(grandTotal()).toHaveTextContent('134 EUR');
+		await expect.element(page.getByLabelText('Description 1.1.2', { exact: true })).toHaveFocus();
+	});
+
+	it('adds beside a Group at the Group level, not inside it', async () => {
+		editor(nested());
+		await page.getByRole('button', { name: 'Add item below 1', exact: true }).click();
+		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']);
+		const kinds = [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-kind'));
+		expect(kinds[0]).toBe('group');
+		expect(kinds[5]).toBe('line');
+	});
+
+	it('is one undoable command: undo removes the Item, redo restores the same identities and order', async () => {
+		editor(nested());
+		const before = rowIds();
+
+		await page.getByRole('button', { name: 'Add item below 1.1.1' }).click();
+		const afterAdd = rowIds();
+		expect(afterAdd).toHaveLength(before.length + 1);
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		expect(rowIds()).toEqual(before);
+		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeDisabled(); // a single command
+
+		await page.getByRole('button', { name: 'Redo' }).click();
+		expect(rowIds()).toEqual(afterAdd); // same UUIDs, same order
+		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.1.3', '1.2']);
+	});
+
+	it('keeps existing rows and their values intact', async () => {
+		editor(nested());
+		const before = table();
+		await page.getByRole('button', { name: 'Add item below 1.2' }).click();
+		const after = table();
+		expect(after.filter((row) => row[0] !== '1.3')).toEqual(before);
+		expect(after.at(-1)).toEqual(['1.3', '', '1', '', '0', '0']);
+	});
+
+	it('shows a row action only for editable tables, with an accessible name per row', async () => {
+		render(BudgetSpreadsheet, { rows: openStore(nested()).rows });
+		expect(document.querySelector('tbody button')).toBeNull(); // read-only table: no controls
+		expect([...document.querySelectorAll('thead th')]).toHaveLength(6);
+	});
+
+	it('adds a labelled Actions column when editable', async () => {
+		editor(nested());
+		const headers = [...document.querySelectorAll('thead th')].map((th) => th.textContent?.trim());
+		expect(headers).toEqual(['Code', 'Description', 'Quantity', 'Unit', 'Unit price', 'Total', 'Actions']);
+		expect(document.querySelectorAll('tbody button')).toHaveLength(5);
 	});
 });

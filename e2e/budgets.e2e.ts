@@ -219,3 +219,42 @@ describe('Editing cells (built static site)', () => {
 		expect(await page.getByLabel('Unit price 1.1', { exact: true }).inputValue()).toBe('-100');
 	});
 });
+
+describe('Building a Budget from nothing (built static site)', () => {
+	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
+
+	it('adds top-level and sibling Items, edits them, and undoes the insertion', async () => {
+		await page.goto(`${baseUrl}/budgets/new`);
+		await page.getByLabel('Name').fill('From scratch');
+		await page.getByLabel('Currency').selectOption('EUR');
+		await page.getByRole('button', { name: 'Create Budget' }).click();
+		await page.getByText('This Budget has no Items yet.').waitFor();
+
+		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByLabel('Description 1', { exact: true }).fill('Venue');
+		await page.keyboard.press('Enter');
+		await page.getByLabel('Unit price 1', { exact: true }).fill('1500');
+		await page.keyboard.press('Enter');
+
+		await page.getByRole('button', { name: 'Add item below 1' }).click();
+		await page.getByLabel('Description 2', { exact: true }).fill('Catering');
+		await page.keyboard.press('Enter');
+		await page.getByLabel('Quantity 2', { exact: true }).fill('2');
+		await page.keyboard.press('Enter');
+		await page.getByLabel('Unit price 2', { exact: true }).fill('-250.5');
+		await page.keyboard.press('Enter');
+
+		await expect.poll(total).toBe('999.0 EUR'); // 1500 + (-250.5 x 2)
+		expect(await page.locator('tbody tr').count()).toBe(2);
+
+		await page.getByRole('button', { name: 'Add item below 1' }).click(); // inserted between the two
+		const descriptions = () => page.locator('tbody tr').evaluateAll((rows) => rows.map((r) => r.querySelector('input')?.value));
+		await expect.poll(descriptions).toEqual(['Venue', '', 'Catering']);
+		expect(await total()).toBe('999.0 EUR');
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		await expect.poll(descriptions).toEqual(['Venue', 'Catering']);
+		await page.getByRole('button', { name: 'Redo' }).click();
+		await expect.poll(descriptions).toEqual(['Venue', '', 'Catering']);
+	});
+});

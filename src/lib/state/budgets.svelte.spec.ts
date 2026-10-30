@@ -413,6 +413,124 @@ describe('editItem', () => {
 	});
 });
 
+describe('adding Items', () => {
+	function openA() {
+		seedStorage();
+		const store = newStore();
+		store.hydrate();
+		store.select(A);
+		return store;
+	}
+	const idsOf = (store: BudgetStore) => store.itemsOf(A).map((i) => i.id);
+
+	it('adds the first Item to an empty Budget as one command, with defaults and a zero total', () => {
+		const store = newStore();
+		store.hydrate();
+		const created = store.createBudget({ name: 'Blank', currency: 'EUR' });
+		if (!created.ok) throw new Error('creation failed');
+		const id = created.budget.id;
+		store.select(id);
+
+		const added = store.addTopLevelItem(id);
+		expect(added.ok).toBe(true);
+		expect(store.rows.map((row) => row.code)).toEqual(['1']);
+		expect(store.rows[0].item).toMatchObject({ description: '', quantity: '1', unitPrice: '0', parentId: null, budgetId: id });
+		expect(toString(store.grandTotal)).toBe('0');
+
+		expect(store.undo(id)).toBe(true);
+		expect(store.itemsOf(id)).toEqual([]);
+		expect(store.canUndo(id)).toBe(false); // one insertion was one command
+	});
+
+	it('adds a top-level Item after the existing roots with immediate Codes and unchanged totals', () => {
+		const store = openA();
+		const before = toString(store.grandTotal);
+		const added = store.addTopLevelItem(A, { description: 'Photography' });
+		if (!added.ok) throw new Error('rejected');
+		expect(store.rows.map((row) => `${row.code} ${row.item.description}`).at(-1)).toBe('2 Photography');
+		expect(toString(store.grandTotal)).toBe(before);
+	});
+
+	it('adds a sibling after a nested Item, with the correct parent, order and Codes', () => {
+		const store = openA();
+		const added = store.addSiblingItem(A, uuid(3), { description: 'Sibling' }); // after Item 3, inside the inner Group
+		if (!added.ok) throw new Error('rejected');
+		expect(added.item.parentId).toBe(uuid(2));
+		expect(store.rows.map((row) => `${row.code} ${row.item.description}`)).toEqual([
+			'1 item 1',
+			'1.1 item 2',
+			'1.1.1 item 3',
+			'1.1.2 Sibling',
+			'1.1.3 item 4',
+			'1.2 item 5'
+		]);
+		expect(toString(store.grandTotal)).toBe('134'); // a new Line is 0 x 1
+	});
+
+	it('undo removes the Item and redo restores the same identity and order', () => {
+		const store = openA();
+		const before = store.itemsOf(A);
+		const added = store.addSiblingItem(A, uuid(2), { description: 'Added' });
+		if (!added.ok) throw new Error('rejected');
+		const afterAdd = store.itemsOf(A);
+		const orderAfterAdd = idsOf(store);
+
+		expect(store.undo(A)).toBe(true);
+		expect(store.itemsOf(A)).toEqual(before);
+
+		expect(store.redo(A)).toBe(true);
+		expect(store.itemsOf(A)).toEqual(afterAdd);
+		expect(idsOf(store)).toEqual(orderAfterAdd);
+		expect(store.itemsOf(A).filter((i) => i.id === added.item.id)).toHaveLength(1);
+		expect(store.canRedo(A)).toBe(false);
+	});
+
+	it('records one command per insertion and clears redo on a new insertion', () => {
+		const store = openA();
+		store.addTopLevelItem(A);
+		store.addTopLevelItem(A);
+		store.undo(A);
+		expect(store.canRedo(A)).toBe(true);
+		store.addTopLevelItem(A);
+		expect(store.canRedo(A)).toBe(false);
+		expect(store.undo(A)).toBe(true);
+		expect(store.undo(A)).toBe(true);
+		expect(store.canUndo(A)).toBe(false);
+		expect(store.itemsOf(A)).toEqual(nestedA());
+	});
+
+	it('leaves existing rows and references intact', () => {
+		const store = openA();
+		const before = store.itemsOf(A);
+		store.addSiblingItem(A, uuid(1));
+		for (const original of before) {
+			const now = store.itemsOf(A).find((i) => i.id === original.id)!;
+			expect(now.parentId).toBe(original.parentId);
+			expect(now.description).toBe(original.description);
+		}
+		expect(store.loadIssues).toEqual([]);
+	});
+
+	it('rejects an unknown sibling or Budget without recording anything', () => {
+		const store = openA();
+		expect(store.addSiblingItem(A, uuid(999))).toEqual({ ok: false, reason: 'unknown-item' });
+		expect(store.addTopLevelItem(uuid(777))).toEqual({ ok: false, reason: 'unknown-budget' });
+		expect(store.addSiblingItem(uuid(777), uuid(1))).toEqual({ ok: false, reason: 'unknown-budget' });
+		expect(store.canUndo(A)).toBe(false);
+	});
+
+	it('keeps insertions in each Budget separate', () => {
+		seedStorage();
+		bubuStorage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore();
+		store.hydrate();
+		store.addTopLevelItem(A);
+		expect(store.canUndo(A)).toBe(true);
+		expect(store.canUndo(B)).toBe(false);
+		expect(store.itemsOf(B)).toHaveLength(1);
+	});
+});
+
 describe('createBudget', () => {
 	it('adds one root Budget with no Items and a zero grand total, without selecting it', () => {
 		const store = newStore();

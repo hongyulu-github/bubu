@@ -4,13 +4,15 @@
 
 	interface Props extends Omit<HTMLButtonAttributes, 'children'> {
 		variant?: 'primary' | 'secondary' | 'destructive';
+		/** Smaller, for dense layouts such as table rows. */
+		compact?: boolean;
 		children: Snippet;
 	}
 
-	let { variant = 'secondary', type = 'button', children, ...rest }: Props = $props();
+	let { variant = 'secondary', compact = false, type = 'button', children, ...rest }: Props = $props();
 </script>
 
-<button {type} class="button {variant}" {...rest}>
+<button {type} class="button {variant}" class:compact {...rest}>
 	{@render children()}
 </button>
 
@@ -30,6 +32,12 @@
 		transition:
 			background-color var(--duration-fast),
 			opacity var(--duration-fast);
+	}
+
+	.compact {
+		min-height: 2.25rem;
+		padding: 0 var(--space-3);
+		font-size: var(--font-size-callout);
 	}
 
 	.button:focus-visible {
