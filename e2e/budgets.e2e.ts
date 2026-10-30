@@ -258,3 +258,35 @@ describe('Building a Budget from nothing (built static site)', () => {
 		await expect.poll(descriptions).toEqual(['Venue', '', 'Catering']);
 	});
 });
+
+describe('Renaming a Budget (built static site)', () => {
+	it('renames from the editor, keeps the Items, and shows the new name in the list', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+
+		await page.getByRole('button', { name: 'Rename' }).click();
+		await page.getByLabel('Name', { exact: true }).fill('');
+		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByText('Enter a name for the Budget.').waitFor();
+
+		await page.getByLabel('Name', { exact: true }).fill('Garden wedding');
+		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('heading', { name: 'Garden wedding' }).waitFor();
+		expect(await items()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
+
+		await page.getByRole('link', { name: /All Budgets/ }).click();
+		await page.getByRole('link', { name: /Garden wedding/ }).waitFor();
+		expect(await page.getByRole('link', { name: /Wedding$/ }).count()).toBe(0);
+		expect(await page.getByRole('link', { name: /Renovation/ }).count()).toBe(1);
+	});
+
+	it('leaves the name alone when cancelled', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('button', { name: 'Rename' }).click();
+		await page.getByLabel('Name', { exact: true }).fill('Nope');
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		expect(await page.getByRole('heading', { name: 'Nope' }).count()).toBe(0);
+	});
+});

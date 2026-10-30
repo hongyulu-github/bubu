@@ -531,6 +531,98 @@ describe('adding Items', () => {
 	});
 });
 
+describe('renameBudget', () => {
+	function openBoth() {
+		seedStorage();
+		bubuStorage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore();
+		store.hydrate();
+		store.select(A);
+		return store;
+	}
+
+	it('updates only the name and updatedAt of the intended Budget', () => {
+		const store = openBoth();
+		const before = store.budgets.find((b) => b.id === A)!;
+		const other = store.budgets.find((b) => b.id === B)!;
+
+		const result = store.renameBudget(A, '  Summer wedding ');
+		expect(result.ok && result.changed).toBe(true);
+
+		const after = store.budgets.find((b) => b.id === A)!;
+		expect(after).toEqual({ ...before, name: 'Summer wedding', updatedAt: '2026-05-06T07:08:09.000Z' });
+		expect(after.id).toBe(before.id);
+		expect(after.currency).toBe(before.currency);
+		expect(after.createdAt).toBe(before.createdAt);
+		expect(store.budgets.find((b) => b.id === B)).toBe(other); // the other Budget is untouched
+		expect(store.activeBudget?.name).toBe('Summer wedding');
+	});
+
+	it('leaves every Item, their order and the derived data exactly as they were', () => {
+		const store = openBoth();
+		const items = store.itemsOf(A);
+		const rows = store.rows.map((row) => `${row.code} ${row.item.description}`);
+
+		store.renameBudget(A, 'Renamed');
+
+		expect(store.itemsOf(A)).toBe(items); // the very same array
+		expect(store.itemsOf(B)).toEqual([item(B, 1, null, '100')]);
+		expect(store.rows.map((row) => `${row.code} ${row.item.description}`)).toEqual(rows);
+		expect(toString(store.grandTotal)).toBe('134');
+	});
+
+	it('is not an Item command: no history is added and existing history is untouched', () => {
+		const store = openBoth();
+		store.renameBudget(A, 'Renamed');
+		expect(store.canUndo(A)).toBe(false); // renaming did not create an undo step
+
+		store.editItem(A, uuid(3), 'quantity', '2');
+		store.renameBudget(A, 'Renamed again');
+		store.renameBudget(B, 'Other renamed');
+		expect(store.canUndo(A)).toBe(true);
+		expect(store.undo(A)).toBe(true); // undo reverts the Item edit, not the rename
+		expect(store.itemsOf(A).find((i) => i.id === uuid(3))?.quantity).toBe('1');
+		expect(store.budgets.find((b) => b.id === A)?.name).toBe('Renamed again');
+		expect(store.canUndo(A)).toBe(false);
+		expect(store.canRedo(A)).toBe(true); // redo stack intact too
+	});
+
+	it('rejects an empty name and changes nothing', () => {
+		const store = openBoth();
+		const before = store.budgets;
+		for (const name of ['', '   ']) {
+			expect(store.renameBudget(A, name)).toEqual({
+				ok: false,
+				reason: 'invalid',
+				errors: { name: 'Enter a name for the Budget.' }
+			});
+		}
+		expect(store.budgets).toBe(before);
+	});
+
+	it('does nothing for an unknown Budget', () => {
+		const store = openBoth();
+		const before = store.budgets;
+		expect(store.renameBudget(uuid(777), 'x')).toEqual({ ok: false, reason: 'unknown-budget' });
+		expect(store.budgets).toBe(before);
+	});
+
+	it('leaves updatedAt alone when the name is unchanged', () => {
+		const store = openBoth();
+		const before = store.budgets;
+		expect(store.renameBudget(A, 'Wedding')).toMatchObject({ ok: true, changed: false });
+		expect(store.budgets).toBe(before);
+		expect(store.budgets.find((b) => b.id === A)?.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+	});
+
+	it('does not write to storage (persistence is wired elsewhere)', () => {
+		const store = openBoth();
+		const snapshot = JSON.stringify({ ...localStorage });
+		store.renameBudget(A, 'Renamed');
+		expect(JSON.stringify({ ...localStorage })).toBe(snapshot);
+	});
+});
+
 describe('createBudget', () => {
 	it('adds one root Budget with no Items and a zero grand total, without selecting it', () => {
 		const store = newStore();

@@ -13,9 +13,15 @@ export interface BudgetFormErrors {
 
 export type CreateBudgetResult = { ok: true; budget: Budget } | { ok: false; errors: BudgetFormErrors };
 
+/** The name rule shared by creating and renaming a Budget: not empty after trimming. */
+export function validateBudgetName(name: string): string | undefined {
+	return name.trim() === '' ? 'Enter a name for the Budget.' : undefined;
+}
+
 export function validateBudgetForm({ name, currency }: BudgetFormInput): BudgetFormErrors {
 	const errors: BudgetFormErrors = {};
-	if (name.trim() === '') errors.name = 'Enter a name for the Budget.';
+	const nameError = validateBudgetName(name);
+	if (nameError) errors.name = nameError;
 	if (currency === '') errors.currency = 'Choose a currency.';
 	else if (!isSupportedCurrency(currency)) errors.currency = 'Choose a currency from the list.';
 	return errors;

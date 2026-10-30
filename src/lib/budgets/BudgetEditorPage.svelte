@@ -4,6 +4,7 @@
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import Button from '../components/Button.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
+	import RenameBudgetDialog from './RenameBudgetDialog.svelte';
 
 	let { budgetId, store = budgetStore }: { budgetId: string; store?: BudgetStore } = $props();
 
@@ -20,6 +21,7 @@
 
 	// Only show Items once the store has switched to this route's Budget, so a previously open
 	// Budget's Items can never flash up under the wrong heading.
+	let renaming = $state(false);
 	const ready = $derived(store.activeBudgetId === budgetId);
 
 	/** Move the cursor to the new row's Description so the user can type straight away. */
@@ -50,7 +52,10 @@
 	{:else if budget}
 		<header>
 			<div>
-				<h1>{budget.name}</h1>
+				<div class="title">
+					<h1>{budget.name}</h1>
+					<Button compact onclick={() => (renaming = true)}>Rename</Button>
+				</div>
 				<p class="meta">{budget.currency}</p>
 			</div>
 			{#if ready}
@@ -60,6 +65,8 @@
 				</p>
 			{/if}
 		</header>
+
+		<RenameBudgetDialog {budgetId} bind:open={renaming} {store} />
 
 		{#if ready}
 			<div class="history" role="group" aria-label="History">
@@ -134,6 +141,13 @@
 		justify-content: space-between;
 		gap: var(--space-4);
 		margin-bottom: var(--space-3);
+	}
+
+	.title {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: var(--space-3);
 	}
 
 	.add {

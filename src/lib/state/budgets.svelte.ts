@@ -1,6 +1,7 @@
 import { calculateTotals, type ItemAmounts } from '../budget/calculate';
 import { applyFieldEdit, type EditResult, type EditableField } from '../budget/edit';
 import { insertSiblingItem, insertTopLevelItem, type InsertResult, type NewItemFields } from '../budget/insert';
+import { renameBudgetDocument } from '../budget/rename';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
 import type { Budget, Item, ItemKind, Uuid } from '../budget/model';
 import { buildItemTree } from '../budget/tree';
@@ -42,6 +43,11 @@ export type MutationResult =
 export type AddItemResult =
 	| { ok: true; item: Item }
 	| { ok: false; reason: 'unknown-budget' | 'unknown-item' | 'invalid' };
+
+export type RenameBudgetResult =
+	| { ok: true; changed: boolean; budget: Budget }
+	| { ok: false; reason: 'unknown-budget' }
+	| { ok: false; reason: 'invalid'; errors: { name: string } };
 
 export type HydrationStatus = 'idle' | 'ready' | 'unavailable';
 
@@ -167,6 +173,22 @@ export class BudgetStore {
 		if (!created.ok) return created;
 		this.setBudget(created.budget, []);
 		return created;
+	}
+
+	/**
+	 * Rename a Budget: a document-level change, not an Item command. Only the name and updatedAt
+	 * change; Items, their order and every history stack are left exactly as they are.
+	 */
+	renameBudget(budgetId: Uuid, name: string): RenameBudgetResult {
+		const budget = this.budgets.find((candidate) => candidate.id === budgetId);
+		if (!budget) return { ok: false, reason: 'unknown-budget' };
+
+		const renamed = renameBudgetDocument(budget, name, this.#now());
+		if (!renamed.ok) return { ok: false, reason: 'invalid', errors: renamed.errors };
+		if (renamed.changed) {
+			this.budgets = this.budgets.map((candidate) => (candidate.id === budgetId ? renamed.budget : candidate));
+		}
+		return { ok: true, changed: renamed.changed, budget: renamed.budget };
 	}
 
 	/** Remove a Budget from state (its history stays in memory until the page reloads). */
