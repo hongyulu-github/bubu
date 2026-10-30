@@ -28,6 +28,7 @@
 		border-radius: var(--radius-md);
 		font: inherit;
 		font-weight: var(--font-weight-medium);
+		white-space: nowrap;
 		cursor: pointer;
 		transition:
 			background-color var(--duration-fast),

@@ -15,9 +15,12 @@
 		onedit?: (itemId: string, field: EditableField, text: string) => EditResult;
 		/** Add an Item directly after this one, under the same parent. Shows a row action when given. */
 		onadd?: (siblingId: string) => void;
+		/** Delete this Item (and anything beneath it). Shows a row action when given. */
+		ondelete?: (itemId: string) => void;
 	}
 
-	let { rows, onedit, onadd }: Props = $props();
+	let { rows, onedit, onadd, ondelete }: Props = $props();
+	const hasActions = $derived(onadd !== undefined || ondelete !== undefined);
 </script>
 
 <!--
@@ -41,11 +44,11 @@
 		<colgroup>
 			<col style="width: 5rem" />
 			<col />
-			<col style="width: 7.5rem" />
-			<col style="width: 7.5rem" />
-			<col style="width: 9rem" />
-			<col style="width: 9rem" />
-			{#if onadd}<col style="width: 8.5rem" />{/if}
+			<col style="width: 6.5rem" />
+			<col style="width: 6.5rem" />
+			<col style="width: 8rem" />
+			<col style="width: 8rem" />
+			{#if hasActions}<col style="width: 14rem" />{/if}
 		</colgroup>
 		<thead>
 			<tr>
@@ -55,7 +58,7 @@
 				<TableCell header scope="col">Unit</TableCell>
 				<TableCell header scope="col" numeric>Unit price</TableCell>
 				<TableCell header scope="col" numeric>Total</TableCell>
-				{#if onadd}
+				{#if hasActions}
 					<TableCell header scope="col"><span class="visually-hidden">Actions</span></TableCell>
 				{/if}
 			</tr>
@@ -94,9 +97,16 @@
 						{/if}
 					</TableCell>
 					<TableCell numeric readonly strong>{toString(row.amounts.total)}</TableCell>
-					{#if onadd}
+					{#if hasActions}
 						<TableCell>
-							<Button compact aria-label="Add item below {row.code}" onclick={() => onadd(row.id)}>Add below</Button>
+							<div class="actions">
+								{#if onadd}
+									<Button compact aria-label="Add item below {row.code}" onclick={() => onadd(row.id)}>Add below</Button>
+								{/if}
+								{#if ondelete}
+									<Button compact aria-label="Delete {row.code}" onclick={() => ondelete(row.id)}>Delete</Button>
+								{/if}
+							</div>
 						</TableCell>
 					{/if}
 				</tr>
@@ -128,6 +138,11 @@
 		overflow: hidden;
 		clip-path: inset(50%);
 		white-space: nowrap;
+	}
+
+	.actions {
+		display: flex;
+		gap: var(--space-2);
 	}
 
 	.code {

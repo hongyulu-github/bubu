@@ -290,3 +290,36 @@ describe('Renaming a Budget (built static site)', () => {
 		expect(await page.getByRole('heading', { name: 'Nope' }).count()).toBe(0);
 	});
 });
+
+describe('Deleting Items (built static site)', () => {
+	const rows = () => items();
+
+	it('confirms before deleting a Group, can cancel, deletes the subtree, and undoes it', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		expect(await rows()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
+
+		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
+		await page.getByRole('dialog', { name: 'Delete “Venue”?' }).waitFor();
+		expect(await page.getByRole('dialog').innerText()).toContain('Hall rental');
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		expect(await rows()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
+
+		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+		await expect.poll(rows).toEqual(['1 Music']);
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		await expect.poll(rows).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
+		await page.getByRole('button', { name: 'Redo' }).click();
+		await expect.poll(rows).toEqual(['1 Music']);
+	});
+
+	it('deletes a Line immediately and normalizes its now-childless parent', async () => {
+		await page.goto(`${baseUrl}/budgets/${A}`);
+		await page.getByLabel('Unit price 1.1', { exact: true }).waitFor();
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+		await expect.poll(rows).toEqual(['1 Venue', '2 Music']);
+		expect(await page.getByLabel('Unit price 1', { exact: true }).inputValue()).toBe('0'); // Venue is a Line again
+	});
+});

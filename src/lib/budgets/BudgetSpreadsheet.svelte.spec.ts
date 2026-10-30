@@ -446,6 +446,151 @@ describe('adding Items', () => {
 		editor(nested());
 		const headers = [...document.querySelectorAll('thead th')].map((th) => th.textContent?.trim());
 		expect(headers).toEqual(['Code', 'Description', 'Quantity', 'Unit', 'Unit price', 'Total', 'Actions']);
-		expect(document.querySelectorAll('tbody button')).toHaveLength(5);
+		expect(document.querySelectorAll('tbody button')).toHaveLength(10); // Add below and Delete on each of the 5 rows
+	});
+});
+
+describe('deleting Items', () => {
+	function editor(items: Item[]) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const rowIds = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-item-id'));
+	const codes = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-code'));
+	const grandTotal = () => page.getByLabelText('Grand total');
+	const dialog = (name: string | RegExp) => page.getByRole('dialog', { name });
+
+	it('deletes a Line straight away (no confirmation), with Codes and totals refreshed', async () => {
+		editor(nested());
+		await page.getByRole('button', { name: 'Delete 1.2', exact: true }).click(); // the 7 Line
+		expect(document.querySelector('dialog[open]')).toBeNull();
+		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2']);
+		await expect.element(grandTotal()).toHaveTextContent('120 EUR');
+	});
+
+	it('asks before deleting a Group, naming what goes with it', async () => {
+		editor(nested());
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+
+		await expect.element(dialog('Delete “Item 2”?')).toBeVisible();
+		await expect.element(dialog('Delete “Item 2”?')).toHaveAccessibleDescription(
+			'This removes the group and 2 items inside it. You can undo this.'
+		);
+		const listed = [...document.querySelectorAll('dialog ul.impact li')].map((li) => li.textContent?.trim());
+		expect(listed).toEqual(['Item 3', 'Item 4']);
+		expect(rowIds()).toHaveLength(5); // nothing deleted yet
+	});
+
+	it('changes nothing when cancelled, by button or Escape', async () => {
+		const store = editor(nested());
+		const before = rowIds();
+		const items = store.items;
+
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		await expect.element(dialog('Delete “Item 2”?')).not.toBeInTheDocument();
+		expect(rowIds()).toEqual(before);
+		expect(store.items).toBe(items);
+		expect(store.canUndo(BUDGET)).toBe(false);
+
+		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(dialog('Delete “Item 1”?')).not.toBeInTheDocument();
+		expect(store.items).toBe(items);
+		expect(store.canUndo(BUDGET)).toBe(false);
+		await expect.element(grandTotal()).toHaveTextContent('134 EUR');
+	});
+
+	it('on confirmation removes the whole subtree, leaving no orphans, and refreshes Codes and totals', async () => {
+		const store = editor(nested());
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+		await dialog('Delete “Item 2”?').getByRole('button', { name: 'Delete' }).click();
+
+		await expect.element(dialog('Delete “Item 2”?')).not.toBeInTheDocument();
+		expect(codes()).toEqual(['1', '1.1']);
+		expect(store.itemsOf(BUDGET).map((i) => i.id)).toEqual([uuid(1), uuid(5)]);
+		await expect.element(grandTotal()).toHaveTextContent('14 EUR');
+		expect(store.tree.unreachableIds).toEqual([]);
+	});
+
+	it('normalizes a parent that loses its last child: it becomes a Line and its stored price resets to 0', async () => {
+		const store = editor([item(1, null, '999', '2'), item(2, 1, '10')]);
+		await expect.element(grandTotal()).toHaveTextContent('20 EUR');
+		expect(document.querySelector('[aria-label="Unit price 1"]')).toBeNull(); // a Group: calculated
+
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+
+		expect(codes()).toEqual(['1']);
+		await expect.element(page.getByLabelText('Unit price 1', { exact: true })).toHaveValue('0'); // now an editable Line
+		await expect.element(page.getByLabelText('Quantity 1', { exact: true })).toHaveValue('2'); // quantity kept
+		await expect.element(grandTotal()).toHaveTextContent('0 EUR');
+		expect(store.itemsOf(BUDGET)[0].unitPrice).toBe('0');
+	});
+
+	it('warns in the confirmation when the parent will become a Line', async () => {
+		editor([item(1, null, '5'), item(2, 1, '0'), item(3, 2, '1')]); // 1 > 2 > 3
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+		await expect.element(
+			page.getByText('“Item 1” has no other items, so it becomes a Line and its Unit price resets to 0.')
+		).toBeVisible();
+	});
+
+	it('does not show that warning when the parent keeps other children', async () => {
+		editor(nested());
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click(); // Outer also has 1.2
+		expect(document.querySelector('dialog .note')).toBeNull();
+	});
+
+	it('undo restores all UUIDs, hierarchy, order and parent pricing; redo removes the same subtree as one command', async () => {
+		const store = editor([item(1, null, '999', '2'), item(2, 1, '0', '3'), item(3, 2, '10'), item(4, 2, '5', '2')]);
+		const before = rowIds();
+		const original = store.itemsOf(BUDGET);
+
+		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click();
+		await dialog('Delete “Item 2”?').getByRole('button', { name: 'Delete' }).click();
+		const after = rowIds();
+		expect(after).toEqual([uuid(1)]);
+		await expect.element(page.getByLabelText('Unit price 1', { exact: true })).toHaveValue('0');
+
+		await page.getByRole('button', { name: 'Undo' }).click();
+		expect(rowIds()).toEqual(before);
+		expect(store.itemsOf(BUDGET)).toEqual(original);
+		expect(store.itemsOf(BUDGET)[0].unitPrice).toBe('999'); // original parent pricing is back
+		await expect.element(page.getByRole('button', { name: 'Undo' })).toBeDisabled(); // a single command
+
+		await page.getByRole('button', { name: 'Redo' }).click();
+		expect(rowIds()).toEqual(after);
+		await expect.element(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
+	});
+
+	it('puts focus somewhere stable after a deletion', async () => {
+		editor(nested());
+		await page.getByRole('button', { name: 'Delete 1.2', exact: true }).click();
+		await expect.element(page.getByRole('button', { name: 'Add item', exact: true })).toHaveFocus();
+	});
+
+	it('uses the singular for a Group with one item inside', async () => {
+		editor([item(1, null, '0'), item(2, 1, '1')]);
+		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
+		await expect.element(dialog('Delete “Item 1”?')).toHaveAccessibleDescription(
+			'This removes the group and 1 item inside it. You can undo this.'
+		);
+	});
+
+	it('truncates a long impact list but still states the count', async () => {
+		const items = [item(1, null, '0'), ...Array.from({ length: 8 }, (_, i) => item(i + 2, 1, '1'))];
+		editor(items);
+		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
+		await expect.element(dialog('Delete “Item 1”?')).toHaveAccessibleDescription(
+			'This removes the group and 8 items inside it. You can undo this.'
+		);
+		const listed = [...document.querySelectorAll('dialog ul.impact li')].map((li) => li.textContent?.trim());
+		expect(listed).toEqual(['Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'and 3 more']);
+	});
+
+	it('shows no Delete action in a read-only table', async () => {
+		render(BudgetSpreadsheet, { rows: openStore(nested()).rows });
+		expect(document.querySelector('tbody button')).toBeNull();
 	});
 });

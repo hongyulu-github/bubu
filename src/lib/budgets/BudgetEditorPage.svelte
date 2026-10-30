@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { describeDeletion, type DeletionImpact } from '../budget/delete';
 	import { toString } from '../budget/numbers';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import Button from '../components/Button.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
+	import ConfirmDeleteDialog from './ConfirmDeleteDialog.svelte';
 	import RenameBudgetDialog from './RenameBudgetDialog.svelte';
 
 	let { budgetId, store = budgetStore }: { budgetId: string; store?: BudgetStore } = $props();
@@ -22,12 +24,39 @@
 	// Only show Items once the store has switched to this route's Budget, so a previously open
 	// Budget's Items can never flash up under the wrong heading.
 	let renaming = $state(false);
+	let confirmingDelete = $state(false);
+	let pendingDelete = $state<DeletionImpact | null>(null);
 	const ready = $derived(store.activeBudgetId === budgetId);
 
 	/** Move the cursor to the new row's Description so the user can type straight away. */
 	async function focusDescription(itemId: string) {
 		await tick();
 		document.querySelector<HTMLInputElement>(`tr[data-item-id="${itemId}"] input`)?.focus();
+	}
+
+	/** The deleted row (and the control that opened any dialog) is gone, so put focus somewhere stable. */
+	async function focusAfterDelete() {
+		await tick();
+		document.querySelector<HTMLElement>('[data-add-item]')?.focus();
+	}
+
+	/** A Line is deleted straight away (it can be undone); a Group asks first and names its impact. */
+	function requestDelete(itemId: string) {
+		const impact = describeDeletion(store.itemsOf(budgetId), itemId);
+		if (!impact) return;
+		if (impact.kind === 'line') {
+			store.deleteItem(budgetId, itemId);
+			void focusAfterDelete();
+			return;
+		}
+		pendingDelete = impact;
+		confirmingDelete = true;
+	}
+
+	function confirmDelete() {
+		if (pendingDelete) store.deleteItem(budgetId, pendingDelete.itemId);
+		pendingDelete = null;
+		void focusAfterDelete();
 	}
 
 	async function addTopLevel() {
@@ -67,6 +96,7 @@
 		</header>
 
 		<RenameBudgetDialog {budgetId} bind:open={renaming} {store} />
+		<ConfirmDeleteDialog impact={pendingDelete} bind:open={confirmingDelete} onconfirm={confirmDelete} />
 
 		{#if ready}
 			<div class="history" role="group" aria-label="History">
@@ -82,12 +112,13 @@
 				{rows}
 				onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
 				onadd={addBelow}
+				ondelete={requestDelete}
 			/>
 		{/if}
 
 		{#if ready}
 			<div class="add">
-				<Button variant="primary" onclick={addTopLevel}>Add item</Button>
+				<Button variant="primary" data-add-item onclick={addTopLevel}>Add item</Button>
 			</div>
 		{/if}
 	{:else if loadFailure}

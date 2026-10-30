@@ -531,6 +531,110 @@ describe('adding Items', () => {
 	});
 });
 
+describe('deleteItem', () => {
+	function openA() {
+		seedStorage();
+		const store = newStore();
+		store.hydrate();
+		store.select(A);
+		return store;
+	}
+	const OUTER = uuid(1);
+	const INNER = uuid(2);
+	const LINE_10 = uuid(3);
+	const LINE_7 = uuid(5);
+
+	it('deletes a Line as one command, refreshing Codes and totals', () => {
+		const store = openA();
+		expect(store.deleteItem(A, LINE_7)).toMatchObject({ ok: true, removedIds: [LINE_7] });
+		expect(store.rows.map((row) => row.code)).toEqual(['1', '1.1', '1.1.1', '1.1.2']);
+		expect(toString(store.grandTotal)).toBe('120'); // 2 x (3 x (10 + 10))
+		expect(store.canUndo(A)).toBe(true);
+		store.undo(A);
+		expect(store.canUndo(A)).toBe(false); // one deletion, one command
+	});
+
+	it('deletes a nested Group with all its descendants and leaves no orphans', () => {
+		const store = openA();
+		const result = store.deleteItem(A, INNER);
+		expect(result).toMatchObject({ ok: true, removedIds: [INNER, LINE_10, uuid(4)] });
+		expect(store.itemsOf(A).map((i) => i.id)).toEqual([OUTER, LINE_7]);
+		expect(store.rows.map((row) => row.code)).toEqual(['1', '1.1']);
+		expect(toString(store.grandTotal)).toBe('14'); // 2 x 7
+		expect(store.tree.unreachableIds).toEqual([]);
+	});
+
+	it('normalizes a parent that loses its last child, and undo restores its original pricing', () => {
+		seedStorage();
+		const store = newStore();
+		store.hydrate();
+		store.select(A);
+		// Give the outer Group a hidden manual price, which only matters once it has no children.
+		store.setItems(A, store.itemsOf(A).map((i) => (i.id === OUTER ? { ...i, unitPrice: '999' } : i)));
+		const original = store.itemsOf(A);
+
+		store.deleteItem(A, LINE_7);
+		const second = store.deleteItem(A, INNER); // the last child of Outer
+		expect(second).toMatchObject({ ok: true, normalizedParentId: OUTER });
+
+		const outer = store.itemsOf(A).find((i) => i.id === OUTER)!;
+		expect(outer).toMatchObject({ unitPrice: '0', quantity: '2', description: 'item 1' });
+		expect(store.rows[0].kind).toBe('line');
+		expect(toString(store.grandTotal)).toBe('0'); // not 2 x 999
+
+		store.undo(A);
+		expect(store.itemsOf(A).find((i) => i.id === OUTER)!.unitPrice).toBe('999');
+		store.undo(A);
+		expect(store.itemsOf(A)).toEqual(original);
+	});
+
+	it('undo restores every UUID, the hierarchy and the order; redo removes the same subtree as one command', () => {
+		const store = openA();
+		const before = store.itemsOf(A);
+		const orderBefore = store.rows.map((row) => `${row.code}:${row.id}`);
+
+		store.deleteItem(A, INNER);
+		const after = store.itemsOf(A);
+
+		expect(store.undo(A)).toBe(true);
+		expect(store.itemsOf(A)).toEqual(before);
+		expect(store.rows.map((row) => `${row.code}:${row.id}`)).toEqual(orderBefore);
+		expect(toString(store.grandTotal)).toBe('134');
+
+		expect(store.redo(A)).toBe(true);
+		expect(store.itemsOf(A)).toEqual(after);
+		expect(store.canRedo(A)).toBe(false);
+		expect(store.undo(A)).toBe(true);
+		expect(store.canUndo(A)).toBe(false); // the whole subtree was one command
+	});
+
+	it('a new commit after an undo clears redo', () => {
+		const store = openA();
+		store.deleteItem(A, LINE_7);
+		store.undo(A);
+		expect(store.canRedo(A)).toBe(true);
+		store.deleteItem(A, INNER);
+		expect(store.canRedo(A)).toBe(false);
+	});
+
+	it('does nothing for unknown Items and Budgets', () => {
+		const store = openA();
+		expect(store.deleteItem(A, uuid(999))).toEqual({ ok: false, reason: 'unknown-item' });
+		expect(store.deleteItem(uuid(777), LINE_7)).toEqual({ ok: false, reason: 'unknown-budget' });
+		expect(store.canUndo(A)).toBe(false);
+	});
+
+	it('keeps deletions in each Budget separate', () => {
+		seedStorage();
+		bubuStorage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore();
+		store.hydrate();
+		store.deleteItem(A, LINE_7);
+		expect(store.itemsOf(B)).toHaveLength(1);
+		expect(store.canUndo(B)).toBe(false);
+	});
+});
+
 describe('renameBudget', () => {
 	function openBoth() {
 		seedStorage();

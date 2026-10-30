@@ -1,5 +1,6 @@
 import { calculateTotals, type ItemAmounts } from '../budget/calculate';
 import { applyFieldEdit, type EditResult, type EditableField } from '../budget/edit';
+import { deleteItemSubtree } from '../budget/delete';
 import { insertSiblingItem, insertTopLevelItem, type InsertResult, type NewItemFields } from '../budget/insert';
 import { renameBudgetDocument } from '../budget/rename';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
@@ -42,6 +43,10 @@ export type MutationResult =
 
 export type AddItemResult =
 	| { ok: true; item: Item }
+	| { ok: false; reason: 'unknown-budget' | 'unknown-item' | 'invalid' };
+
+export type DeleteItemResult =
+	| { ok: true; removedIds: Uuid[]; normalizedParentId: Uuid | null }
 	| { ok: false; reason: 'unknown-budget' | 'unknown-item' | 'invalid' };
 
 export type RenameBudgetResult =
@@ -247,6 +252,19 @@ export class BudgetStore {
 	addSiblingItem(budgetId: Uuid, siblingId: Uuid, fields?: NewItemFields): AddItemResult {
 		if (!this.budgets.some((budget) => budget.id === budgetId)) return { ok: false, reason: 'unknown-budget' };
 		return this.#commitInsert(budgetId, insertSiblingItem(this.itemsOf(budgetId), siblingId, fields));
+	}
+
+	/**
+	 * Delete an Item and all its descendants as one undoable command. If its parent loses its last
+	 * child it becomes a Line and its manual Unit price is reset to 0 (see `normalizeParent`).
+	 */
+	deleteItem(budgetId: Uuid, itemId: Uuid): DeleteItemResult {
+		if (!this.budgets.some((budget) => budget.id === budgetId)) return { ok: false, reason: 'unknown-budget' };
+		const deleted = deleteItemSubtree(this.itemsOf(budgetId), itemId);
+		if (!deleted.ok) return deleted;
+		const committed = this.execute(budgetId, deleted.items);
+		if (!committed.ok) return { ok: false, reason: 'invalid' };
+		return { ok: true, removedIds: deleted.removedIds, normalizedParentId: deleted.normalizedParentId };
 	}
 
 	#commitInsert(budgetId: Uuid, inserted: InsertResult): AddItemResult {
