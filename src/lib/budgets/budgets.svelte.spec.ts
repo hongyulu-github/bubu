@@ -75,6 +75,57 @@ describe('BudgetsList', () => {
 		await expect.element(page.getByRole('link', { name: 'New Budget' })).toHaveAttribute('href', '/budgets/new');
 	});
 
+	it('duplicates a Budget from the list and shows the copy next to the original', async () => {
+		seed();
+		const store = newStore();
+		render(BudgetsList, { store });
+		await expect.element(page.getByRole('link', { name: /Wedding/ })).toBeVisible();
+
+		await page.getByRole('button', { name: 'Duplicate Wedding' }).click();
+
+		await expect.element(page.getByRole('link', { name: /Wedding \(copy\)/ })).toBeVisible();
+		expect(document.querySelectorAll('main ul li')).toHaveLength(3);
+		await expect.element(page.getByRole('link', { name: /^Wedding EUR/ })).toBeVisible(); // the original is still there
+		expect(store.budgets).toHaveLength(3);
+		const copy = store.budgets.find((b) => b.name === 'Wedding (copy)')!;
+		await expect.element(page.getByRole('link', { name: /Wedding \(copy\)/ })).toHaveAttribute('href', `/budgets/${copy.id}`);
+		await expect.element(page.getByRole('link', { name: /Wedding \(copy\)/ })).toHaveFocus();
+		await expect.element(page.getByRole('status')).toHaveTextContent('Duplicated “Wedding” as “Wedding (copy)”.');
+	});
+
+	it('keeps the original and the copy independent after duplicating', async () => {
+		seed();
+		const store = newStore();
+		render(BudgetsList, { store });
+		await page.getByRole('button', { name: 'Duplicate Wedding' }).click();
+
+		const copy = store.budgets.find((b) => b.name === 'Wedding (copy)')!;
+		const originalBefore = store.itemsOf(A);
+		store.editItem(copy.id, store.itemsOf(copy.id)[0].id, 'description', 'edited copy');
+
+		expect(store.itemsOf(A)).toBe(originalBefore);
+		expect(store.canUndo(A)).toBe(false);
+		expect(store.canUndo(copy.id)).toBe(true);
+	});
+
+	it('offers Duplicate for every Budget, each named for its Budget', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		await expect.element(page.getByRole('button', { name: 'Duplicate Wedding' })).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Duplicate Renovation' })).toBeVisible();
+	});
+
+	it('duplicates an empty Budget as an empty Budget', async () => {
+		seed(); // Renovation has Items; create a blank one in the store
+		const store = newStore();
+		const blank = store.createBudget({ name: 'Blank', currency: 'USD' });
+		if (!blank.ok) throw new Error('creation failed');
+		render(BudgetsList, { store });
+		await page.getByRole('button', { name: 'Duplicate Blank' }).click();
+		const copy = store.budgets.find((b) => b.name === 'Blank (copy)')!;
+		expect(store.itemsOf(copy.id)).toEqual([]);
+	});
+
 	it('shows a loading state before hydration and an empty state with no Budgets', async () => {
 		const store = newStore(false);
 		render(BudgetsList, { store });

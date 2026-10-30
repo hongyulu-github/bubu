@@ -323,3 +323,39 @@ describe('Deleting Items (built static site)', () => {
 		expect(await page.getByLabel('Unit price 1', { exact: true }).inputValue()).toBe('0'); // Venue is a Line again
 	});
 });
+
+describe('Duplicating a Budget (built static site)', () => {
+	it('copies a Budget, opens the copy with the same Items, and keeps the original untouched when the copy changes', async () => {
+		await page.goto(`${baseUrl}/budgets`);
+		await page.getByRole('button', { name: 'Duplicate Wedding' }).click();
+		await page.getByRole('link', { name: /Wedding \(copy\)/ }).waitFor();
+		expect(await page.locator('main ul li').count()).toBe(3);
+
+		await page.getByRole('link', { name: /Wedding \(copy\)/ }).click();
+		await page.getByRole('heading', { name: 'Wedding (copy)' }).waitFor();
+		expect(await items()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
+		const copyUrl = page.url();
+
+		// Change the copy.
+		await page.getByLabel('Description 2', { exact: true }).fill('Changed in the copy');
+		await page.keyboard.press('Enter');
+		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		expect((await items()).length).toBe(4);
+
+		// The original is untouched, and has no history of the copy's edits.
+		await page.getByRole('link', { name: /All Budgets/ }).click();
+		await page.getByRole('link', { name: /^Wedding EUR/ }).click();
+		await page.getByRole('heading', { name: 'Wedding', exact: true }).waitFor();
+		expect(await items()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
+		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(true);
+
+		// The copy kept its changes and its own history (navigating in-app; nothing is saved yet).
+		await page.getByRole('link', { name: /All Budgets/ }).click();
+		await page.getByRole('link', { name: /Wedding \(copy\)/ }).click();
+		await page.getByRole('heading', { name: 'Wedding (copy)' }).waitFor();
+		expect(page.url()).toBe(copyUrl);
+		expect((await items()).length).toBe(4);
+		expect(await page.getByLabel('Description 2', { exact: true }).inputValue()).toBe('Changed in the copy');
+		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(false);
+	});
+});

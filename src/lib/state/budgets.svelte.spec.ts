@@ -531,6 +531,103 @@ describe('adding Items', () => {
 	});
 });
 
+describe('duplicateBudget', () => {
+	function open() {
+		seedStorage();
+		bubuStorage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore();
+		store.hydrate();
+		return store;
+	}
+
+	it('adds an independent copy with new ids, the same values and tree, and new timestamps', () => {
+		const store = open();
+		const result = store.duplicateBudget(A);
+		if (!result.ok) throw new Error('rejected');
+		const copy = result.budget;
+
+		expect(store.budgets).toHaveLength(3);
+		expect(copy).toMatchObject({ name: 'Wedding (copy)', currency: 'EUR', createdAt: '2026-05-06T07:08:09.000Z' });
+		expect(copy.id).not.toBe(A);
+
+		const original = store.itemsOf(A);
+		const duplicated = store.itemsOf(copy.id);
+		expect(duplicated).toHaveLength(original.length);
+		expect(duplicated.some((i) => original.some((o) => o.id === i.id))).toBe(false);
+		expect(duplicated.map((i) => i.description)).toEqual(original.map((i) => i.description));
+		expect(duplicated.map((i) => i.unitPrice)).toEqual(original.map((i) => i.unitPrice));
+
+		store.select(copy.id);
+		expect(toString(store.grandTotal)).toBe('134');
+		expect(store.rows.map((row) => row.code)).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2']);
+	});
+
+	it('duplicates an empty Budget as an empty Budget', () => {
+		const store = open();
+		const result = store.duplicateBudget(B);
+		store.createBudget({ name: 'Blank', currency: 'USD' });
+		const blank = store.budgets.find((b) => b.name === 'Blank')!;
+		const blankCopy = store.duplicateBudget(blank.id);
+		if (!result.ok || !blankCopy.ok) throw new Error('rejected');
+		expect(store.itemsOf(blankCopy.budget.id)).toEqual([]);
+		expect(blankCopy.budget.id).not.toBe(blank.id);
+	});
+
+	it('changes to the copy cannot change the original or its command stack, and vice versa', () => {
+		const store = open();
+		store.editItem(A, uuid(3), 'quantity', '2'); // the original has history
+		const originalItems = store.itemsOf(A);
+
+		const result = store.duplicateBudget(A);
+		if (!result.ok) throw new Error('rejected');
+		const copyId = result.budget.id;
+		expect(store.canUndo(copyId)).toBe(false); // the copy starts with empty history
+		expect(store.canUndo(A)).toBe(true); // the original keeps its own
+
+		const copyLine = store.itemsOf(copyId).find((i) => i.description === 'item 3')!;
+		store.editItem(copyId, copyLine.id, 'quantity', '9');
+		store.addTopLevelItem(copyId);
+		store.deleteItem(copyId, store.itemsOf(copyId)[0].id);
+
+		expect(store.itemsOf(A)).toBe(originalItems); // untouched, same array
+		expect(store.undo(A)).toBe(true); // only the original's single command is on its stack
+		expect(store.canUndo(A)).toBe(false);
+
+		store.editItem(A, uuid(5), 'description', 'only the original');
+		expect(store.itemsOf(copyId).some((i) => i.description === 'only the original')).toBe(false);
+		expect(store.canUndo(copyId)).toBe(true);
+	});
+
+	it('does not select the copy, add history for it or write to storage', () => {
+		const store = open();
+		store.select(A);
+		const snapshot = JSON.stringify({ ...localStorage });
+		const result = store.duplicateBudget(A);
+		if (!result.ok) throw new Error('rejected');
+		expect(store.activeBudgetId).toBe(A);
+		expect(store.canUndo(result.budget.id)).toBe(false);
+		expect(JSON.stringify({ ...localStorage })).toBe(snapshot);
+	});
+
+	it('can be repeated, each copy getting its own ids', () => {
+		const store = open();
+		const first = store.duplicateBudget(A);
+		const second = store.duplicateBudget(A);
+		if (!first.ok || !second.ok) throw new Error('rejected');
+		expect(first.budget.id).not.toBe(second.budget.id);
+		const ids = new Set([A, B, first.budget.id, second.budget.id]);
+		expect(ids.size).toBe(4);
+		const allItemIds = [A, first.budget.id, second.budget.id].flatMap((id) => store.itemsOf(id).map((i) => i.id));
+		expect(new Set(allItemIds).size).toBe(allItemIds.length);
+	});
+
+	it('rejects an unknown Budget', () => {
+		const store = open();
+		expect(store.duplicateBudget(uuid(777))).toEqual({ ok: false, reason: 'unknown-budget' });
+		expect(store.budgets).toHaveLength(2);
+	});
+});
+
 describe('deleteItem', () => {
 	function openA() {
 		seedStorage();

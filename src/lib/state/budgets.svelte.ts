@@ -1,6 +1,7 @@
 import { calculateTotals, type ItemAmounts } from '../budget/calculate';
 import { applyFieldEdit, type EditResult, type EditableField } from '../budget/edit';
 import { deleteItemSubtree } from '../budget/delete';
+import { duplicateBudget } from '../budget/duplicate';
 import { insertSiblingItem, insertTopLevelItem, type InsertResult, type NewItemFields } from '../budget/insert';
 import { renameBudgetDocument } from '../budget/rename';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
@@ -48,6 +49,11 @@ export type AddItemResult =
 export type DeleteItemResult =
 	| { ok: true; removedIds: Uuid[]; normalizedParentId: Uuid | null }
 	| { ok: false; reason: 'unknown-budget' | 'unknown-item' | 'invalid' };
+
+export type DuplicateBudgetResult =
+	| { ok: true; budget: Budget }
+	| { ok: false; reason: 'unknown-budget' }
+	| { ok: false; reason: 'invalid'; issues: ValidationIssue[] };
 
 export type RenameBudgetResult =
 	| { ok: true; changed: boolean; budget: Budget }
@@ -194,6 +200,22 @@ export class BudgetStore {
 			this.budgets = this.budgets.map((candidate) => (candidate.id === budgetId ? renamed.budget : candidate));
 		}
 		return { ok: true, changed: renamed.changed, budget: renamed.budget };
+	}
+
+	/**
+	 * Duplicate a Budget as an independent document: new Budget and Item UUIDs, the same currency,
+	 * values, hierarchy and order, new timestamps, and no history. Not an undoable command, and the
+	 * original (its Items and its history) is left untouched. The copy is not selected.
+	 */
+	duplicateBudget(budgetId: Uuid): DuplicateBudgetResult {
+		const original = this.budgets.find((budget) => budget.id === budgetId);
+		if (!original) return { ok: false, reason: 'unknown-budget' };
+
+		const copy = duplicateBudget(original, this.itemsOf(budgetId), { now: this.#now() });
+		if (!copy.ok) return { ok: false, reason: 'invalid', issues: copy.issues };
+
+		this.setBudget(copy.budget, copy.items);
+		return { ok: true, budget: copy.budget };
 	}
 
 	/** Remove a Budget from state (its history stays in memory until the page reloads). */

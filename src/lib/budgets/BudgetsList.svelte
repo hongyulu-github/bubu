@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+	import Button from '../components/Button.svelte';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 
 	let { store = budgetStore }: { store?: BudgetStore } = $props();
@@ -10,6 +12,20 @@
 				b.updatedAt.localeCompare(a.updatedAt) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
 		)
 	);
+	let message = $state('');
+
+	/** Copy a Budget, then move focus to the copy so keyboard users land on what was made. */
+	async function duplicate(budgetId: string, name: string) {
+		const result = store.duplicateBudget(budgetId);
+		if (!result.ok) {
+			message = `“${name}” could not be duplicated.`;
+			return;
+		}
+		message = `Duplicated “${name}” as “${result.budget.name}”.`;
+		await tick();
+		document.querySelector<HTMLElement>(`a[href="/budgets/${result.budget.id}"]`)?.focus();
+	}
+
 	const unreadable = $derived(store.loadIssues.filter((issue) => issue.budgetId !== undefined));
 </script>
 
@@ -24,6 +40,8 @@
 	{:else if store.hydrationStatus === 'unavailable'}
 		<p class="note" role="alert">Browser storage is not available, so saved Budgets cannot be shown.</p>
 	{:else}
+		<p class="visually-hidden" role="status">{message}</p>
+
 		{#if unreadable.length > 0}
 			<p class="note warning" role="alert">
 				{unreadable.length === 1 ? '1 saved Budget' : `${unreadable.length} saved Budgets`} could not be loaded
@@ -41,6 +59,9 @@
 							<span class="name">{budget.name}</span>
 							<span class="currency">{budget.currency}</span>
 						</a>
+						<Button compact aria-label="Duplicate {budget.name}" onclick={() => duplicate(budget.id, budget.name)}>
+							Duplicate
+						</Button>
 					</li>
 				{/each}
 			</ul>
@@ -97,22 +118,29 @@
 		gap: var(--space-3);
 	}
 
+	li {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+	}
+
+	li:hover {
+		border-color: var(--color-border-strong);
+	}
+
 	ul a {
 		display: flex;
+		flex: 1;
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-4);
 		min-height: var(--control-height);
-		padding: var(--space-3) var(--space-4);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
 		color: var(--color-text);
 		text-decoration: none;
-	}
-
-	ul a:hover {
-		border-color: var(--color-border-strong);
 	}
 
 	ul a:focus-visible {
@@ -128,6 +156,17 @@
 		color: var(--color-text-secondary);
 		font-size: var(--font-size-callout);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.note {
