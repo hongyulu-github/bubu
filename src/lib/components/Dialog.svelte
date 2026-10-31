@@ -71,6 +71,8 @@
 
 <style>
 	dialog {
+		/* Tailwind's reset zeroes margins, which would pin the modal to the top-left corner. */
+		margin: auto;
 		width: min(28rem, calc(100vw - var(--space-6)));
 		padding: 0;
 		border: 1px solid var(--color-border);

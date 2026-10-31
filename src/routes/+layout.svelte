@@ -1,8 +1,10 @@
 <script lang="ts">
+	import '#lib/styles/stdf.css';
 	import '#lib/styles/tokens.css';
 	import '#lib/styles/base.css';
 	import favicon from '#lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
+	import { ConfigProvider, en_US } from 'stdf';
 	import { budgetPersistence, budgetStore } from '#lib';
 	import type { LayoutProps } from './$types';
 
@@ -21,6 +23,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<ConfigProvider locale={en_US}>
 {#if budgetPersistence.failures.length > 0}
 	<!-- Minimal on purpose: the shared error presentation (LUL-30) will replace this. -->
 	<div class="save-error" role="alert">
@@ -30,6 +33,7 @@
 {/if}
 
 {@render children()}
+</ConfigProvider>
 
 <style>
 	.save-error {

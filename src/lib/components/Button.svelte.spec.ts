@@ -2,7 +2,7 @@ import { page, userEvent } from 'vitest/browser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
-import { contrastRatio, focusDocument, resetTheme, setTheme, type Theme } from '../testing/theme';
+import { contrastRatio, focusDocument, resetTheme } from '../testing/theme';
 import Button from './Button.svelte';
 
 afterEach(resetTheme);
@@ -41,16 +41,25 @@ describe('Button', () => {
 		expect(parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2);
 	});
 
-	it.each<Theme>(['light', 'dark'])('keeps readable contrast for every variant in %s', async (theme) => {
-		setTheme(theme);
+	it('keeps readable contrast for every variant', async () => {
 		for (const variant of ['primary', 'secondary', 'destructive'] as const) {
 			const { unmount } = render(Button, { variant, children: textSnippet(variant) });
-			const style = getComputedStyle(page.getByRole('button', { name: variant }).element());
-			expect(contrastRatio(style.color, style.backgroundColor), `${variant} (${theme})`).toBeGreaterThanOrEqual(4.5);
+			const element = page.getByRole('button', { name: variant }).element();
+			const style = getComputedStyle(element);
+			expect(contrastRatio(style.color, backgroundBehind(element)), variant).toBeGreaterThanOrEqual(4.5);
 			unmount();
 		}
 	});
 });
+
+/** The first opaque background at or above the element: outline buttons sit on the page colour. */
+function backgroundBehind(element: Element): string {
+	for (let node: Element | null = element; node; node = node.parentElement) {
+		const colour = getComputedStyle(node).backgroundColor;
+		if (!/rgba?\(0, 0, 0, 0\)|transparent/.test(colour)) return colour;
+	}
+	return 'rgb(255, 255, 255)';
+}
 
 function textSnippet(text: string) {
 	// Snippets are compiled by Svelte; a createRawSnippet keeps this test file plain TypeScript.

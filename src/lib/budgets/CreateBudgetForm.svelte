@@ -4,7 +4,7 @@
 	import { CURRENCIES } from '../budget/currencies';
 	import { validateBudgetForm, type BudgetFormErrors } from '../budget/create';
 	import Button from '../components/Button.svelte';
-	import Input from '../components/Input.svelte';
+	import TextField from '../components/TextField.svelte';
 	import Select from '../components/Select.svelte';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 
@@ -42,7 +42,7 @@
 <main>
 	<h1>New Budget</h1>
 	<form bind:this={form} novalidate onsubmit={submit}>
-		<Input label="Name" bind:value={name} error={errors.name} autocomplete="off" />
+		<TextField label="Name" bind:value={name} error={errors.name} />
 		<Select
 			label="Currency"
 			bind:value={currency}

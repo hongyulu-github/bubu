@@ -1,15 +1,28 @@
 export type Theme = 'light' | 'dark';
 
 export function setTheme(theme: Theme) {
-	document.documentElement.dataset.theme = theme;
+	document.documentElement.dataset.appearance = theme;
 }
 
 export function resetTheme() {
-	delete document.documentElement.dataset.theme;
+	delete document.documentElement.dataset.appearance;
+}
+
+let canvas: CanvasRenderingContext2D | undefined;
+
+/** Computed colours may be `oklch(...)` (stdf themes); a 1px canvas turns any CSS colour into sRGB. */
+function toRgb(value: string): string {
+	if (value.startsWith('rgb')) return value;
+	canvas ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+	canvas.clearRect(0, 0, 1, 1);
+	canvas.fillStyle = value;
+	canvas.fillRect(0, 0, 1, 1);
+	const [r, g, b] = canvas.getImageData(0, 0, 1, 1).data;
+	return `rgb(${r}, ${g}, ${b})`;
 }
 
 function parseRgb(value: string): [number, number, number] {
-	const channels = value.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+	const channels = toRgb(value).match(/[\d.]+/g)?.slice(0, 3).map(Number);
 	if (!channels || channels.length < 3) throw new Error(`Cannot parse colour: ${value}`);
 	return [channels[0], channels[1], channels[2]];
 }

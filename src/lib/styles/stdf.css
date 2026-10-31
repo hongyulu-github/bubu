@@ -1,0 +1,51 @@
+/* Tailwind + the stdf component library, themed "Cherry": raspberry pink on a pale pink canvas,
+   big rounded corners and pill-shaped fields. Swap `name` for another stdf theme to re-skin. */
+@import 'tailwindcss';
+@import 'stdf/source.css';
+
+@plugin 'stdf/theme' {
+	name: 'Cherry';
+}
+
+/* The theme plugin only sets CSS variables; this registers them so utilities such as bg-primary exist.
+   `inline` keeps utilities pointing at the live variable, which [data-theme] on <html> overrides. */
+@theme inline {
+	--color-primary: var(--color-primary);
+	--color-primary-50: var(--color-primary-50);
+	--color-primary-100: var(--color-primary-100);
+	--color-primary-200: var(--color-primary-200);
+	--color-primary-300: var(--color-primary-300);
+	--color-primary-400: var(--color-primary-400);
+	--color-primary-500: var(--color-primary-500);
+	--color-primary-700: var(--color-primary-700);
+	--color-primary-800: var(--color-primary-800);
+	--color-primary-900: var(--color-primary-900);
+	--color-primary-950: var(--color-primary-950);
+	--color-dark: var(--color-dark);
+	--color-dark-50: var(--color-dark-50);
+	--color-dark-100: var(--color-dark-100);
+	--color-dark-200: var(--color-dark-200);
+	--color-dark-300: var(--color-dark-300);
+	--color-dark-400: var(--color-dark-400);
+	--color-dark-500: var(--color-dark-500);
+	--color-dark-700: var(--color-dark-700);
+	--color-dark-800: var(--color-dark-800);
+	--color-dark-900: var(--color-dark-900);
+	--color-dark-950: var(--color-dark-950);
+	--color-bg-base: var(--color-bg-base);
+	--color-bg-surface: var(--color-bg-surface);
+	--color-bg-overlay: var(--color-bg-overlay);
+	--color-bg-highlight: var(--color-bg-highlight);
+	--color-bg-base-dark: var(--color-bg-base-dark);
+	--color-bg-surface-dark: var(--color-bg-surface-dark);
+	--color-bg-overlay-dark: var(--color-bg-overlay-dark);
+	--color-bg-highlight-dark: var(--color-bg-highlight-dark);
+	--color-text-primary: var(--color-text-primary);
+	--color-text-dark: var(--color-text-dark);
+	--color-text-on-primary: var(--color-text-on-primary);
+	--color-text-on-dark: var(--color-text-on-dark);
+	--color-success: var(--color-success);
+	--color-warning: var(--color-warning);
+	--color-error: var(--color-error);
+	--color-info: var(--color-info);
+}

@@ -8,8 +8,8 @@
 
 	// Preview-only override so both themes can be compared without changing the OS setting.
 	$effect(() => {
-		if (theme === 'system') delete document.documentElement.dataset.theme;
-		else document.documentElement.dataset.theme = theme;
+		if (theme === 'system') delete document.documentElement.dataset.appearance;
+		else document.documentElement.dataset.appearance = theme;
 	});
 </script>
 

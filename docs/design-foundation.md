@@ -1,5 +1,11 @@
 # Design foundation
 
+> **Update:** the look is now the [stdf](https://stdf.dev) component library (MIT) with its built-in **Cherry** theme: raspberry pink on a pale pink canvas, big rounded corners, pill-shaped fields. `Button` and the Name fields (`TextField`) are stdf components behind the same app-level wrappers; the grid cell editors, the native `<dialog>` and the currency `<select>` stay native (stdf's Input/Dialog have no per-field aria attributes, refs, `role="dialog"` or Escape handling, which the keyboard grid and accessibility work rely on) and are coloured by the tokens below, which now carry Cherry's palette. The Apple HIG sections below describe the earlier foundation; the accessibility targets (44px controls, 4.5:1 contrast, visible focus) still apply.
+>
+> - Tailwind 4 + stdf are set up in `src/lib/styles/stdf.css`; `<html data-theme="Cherry">` selects the theme (change `name` there and in `app.html` to re-skin). stdf's theme plugin only defines CSS variables, so the `@theme inline` block in that file registers them as Tailwind colours.
+> - stdf defaults to Chinese text, so `+layout.svelte` wraps the app in `ConfigProvider locale={en_US}`.
+> - The app's own light/dark switch attribute is `data-appearance` (it used to be `data-theme`, which stdf owns).
+
 Apple-inspired visual foundation for BuBu: CSS tokens plus five base Svelte 5 components.
 
 ## Source and license
@@ -26,7 +32,7 @@ Apple-inspired visual foundation for BuBu: CSS tokens plus five base Svelte 5 co
 
 Defined in `src/lib/styles/tokens.css`, loaded by `src/routes/+layout.svelte`.
 
-- **Colour:** background, surface, text, secondary text, borders, accent, danger, focus ring, selection, disabled, overlay. Light and dark values; dark applies via `prefers-color-scheme`, and `data-theme="light|dark"` on `<html>` forces a theme (used by tests and the `/design` preview, not exposed to users).
+- **Colour:** background, surface, text, secondary text, borders, accent, danger, focus ring, selection, disabled, overlay. Light and dark values; dark applies via `prefers-color-scheme`, and `data-appearance="light|dark"` on `<html>` forces a theme (used by tests and the `/design` preview, not exposed to users).
 - **Spacing:** `--space-1` to `--space-8` (4px base).
 - **Type:** system stack `-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`; sizes caption to display; no bundled SF Pro.
 - **Radii:** `--radius-sm|md|lg|full`.
