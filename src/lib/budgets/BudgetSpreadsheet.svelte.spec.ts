@@ -1779,7 +1779,7 @@ describe('undo and redo shortcuts', () => {
 	});
 });
 
-describe('row actions as icons and a context menu', () => {
+describe('row actions as icons', () => {
 	function editor(items: Item[] = nested()) {
 		const store = openStore(items);
 		render(BudgetEditorPage, { budgetId: BUDGET, store });
@@ -1788,9 +1788,6 @@ describe('row actions as icons and a context menu', () => {
 	const codes = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-code'));
 	const row = (code: string) => document.querySelector<HTMLElement>(`tr[data-code="${code}"]`)!;
 	const actions = (code: string) => row(code).querySelector<HTMLElement>('.actions')!;
-	const rightClick = (target: Element) =>
-		target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 120 }));
-	const menu = (code: string) => page.getByRole('menu', { name: `Actions for ${code}` });
 
 	it('has no visible text buttons per row: three icon buttons, each named for its row', async () => {
 		editor();
@@ -1814,45 +1811,27 @@ describe('row actions as icons and a context menu', () => {
 		await vi.waitFor(() => expect(getComputedStyle(actions('1.2')).opacity).toBe('1')); // reachable by keyboard
 	});
 
-	it('opens a context menu on right-click with the same actions, Delete last and marked', async () => {
+	it('leaves right-click to the browser everywhere in the table, so cut, copy and paste work in cells', async () => {
 		editor();
-		rightClick(row('1.2').querySelector('[data-cell$="|description"]')!);
-		await expect.element(menu('1.2')).toBeVisible();
-		const items = [...menu('1.2').element().querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim());
-		expect(items).toEqual(['Add item below', 'Add child', 'Delete']);
-		await expect.element(page.getByRole('menuitem', { name: 'Add item below' })).toHaveFocus();
+		for (const target of [
+			page.getByLabelText('Description 1.2', { exact: true }).element(),
+			row('1.2').querySelector('[data-cell$="|code"]')!,
+			row('1').querySelector('[data-cell$="|total"]')!
+		]) {
+			const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 120 });
+			target.dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(false);
+		}
+		expect(document.querySelector('[role="menu"]')).toBeNull();
 	});
 
-	it('runs the chosen action on the right-clicked row', async () => {
+	it('keeps every row action reachable from the keyboard without a menu', async () => {
 		const store = editor();
 		const before = codes().length;
-		rightClick(row('1.2').querySelector('[data-cell$="|code"]')!);
-		await page.getByRole('menuitem', { name: 'Add item below' }).click();
+		page.getByRole('button', { name: 'Add item below 1.2', exact: true }).element().focus();
+		await userEvent.keyboard('{Enter}');
 		expect(codes()).toHaveLength(before + 1);
 		expect(store.canUndo(BUDGET)).toBe(true);
-
-		rightClick(row('1.1.1').querySelector('[data-cell$="|total"]')!);
-		await page.getByRole('menuitem', { name: 'Delete' }).click();
-		expect(codes()).not.toContain('1.1.2');
-	});
-
-	it('closes on Escape without doing anything', async () => {
-		editor();
-		const before = codes();
-		rightClick(row('1').querySelector('[data-cell$="|code"]')!);
-		await expect.element(menu('1')).toBeVisible();
-		await userEvent.keyboard('{Escape}');
-		await expect.element(menu('1')).not.toBeInTheDocument();
-		expect(codes()).toEqual(before);
-	});
-
-	it('leaves the browser menu alone inside a cell input (cut, copy, paste)', async () => {
-		editor();
-		const input = page.getByLabelText('Description 1.2', { exact: true }).element();
-		const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
-		input.dispatchEvent(event);
-		expect(event.defaultPrevented).toBe(false);
-		expect(document.querySelector('[role="menu"]')).toBeNull();
 	});
 });
 

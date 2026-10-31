@@ -14,7 +14,6 @@
 	import { toString } from '../budget/numbers';
 	import Icon from '../components/Icon.svelte';
 	import IconButton from '../components/IconButton.svelte';
-	import Menu, { type MenuItem } from '../components/Menu.svelte';
 	import TableCell from '../components/TableCell.svelte';
 	import type { BudgetRow } from '../state/budgets.svelte';
 	import ItemCellEditor from './ItemCellEditor.svelte';
@@ -142,26 +141,6 @@
 	});
 	const hasActions = $derived(onadd !== undefined || ondelete !== undefined || onaddchild !== undefined);
 	const columnCount = $derived(6 + (hasActions ? 1 : 0));
-
-	// The same row actions, in a right-click (or keyboard context-menu key) menu. Typing fields keep the
-	// browser's own menu for cut, copy and paste.
-	let menu = $state<{ x: number; y: number; row: BudgetRow } | null>(null);
-
-	function menuItems(row: BudgetRow): MenuItem[] {
-		const items: MenuItem[] = [];
-		if (onadd) items.push({ id: 'add', label: 'Add item below', icon: 'addBelow', onselect: () => onadd(row.id) });
-		if (onaddchild) items.push({ id: 'child', label: 'Add child', icon: 'addChild', onselect: () => onaddchild(row.id) });
-		if (ondelete) {
-			items.push({ id: 'delete', label: 'Delete', icon: 'trash', destructive: true, separatorBefore: items.length > 0, onselect: () => ondelete(row.id) });
-		}
-		return items;
-	}
-
-	function oncontextmenu(event: MouseEvent, row: BudgetRow) {
-		if (!hasActions || (event.target as HTMLElement).closest('input, textarea')) return;
-		event.preventDefault();
-		menu = { x: event.clientX, y: event.clientY, row };
-	}
 </script>
 
 <!--
@@ -216,7 +195,6 @@
 					data-depth={row.depth}
 					data-section={group || row.depth > 0 ? '' : undefined}
 					style:--row-tint={group ? `var(--tint-depth-${Math.min(row.depth, 2)})` : undefined}
-					oncontextmenu={(event) => oncontextmenu(event, row)}
 				>
 					<TableCell readonly depth={row.depth} {...cell(row, 'code')}>
 						<div class="code-cell">
@@ -302,10 +280,6 @@
 		</tfoot>
 	</table>
 </div>
-
-{#if menu}
-	<Menu items={menuItems(menu.row)} label="Actions for {menu.row.code}" anchor={{ x: menu.x, y: menu.y }} onclose={() => (menu = null)} />
-{/if}
 
 <style>
 	/* No box around the table: hairline row separators only (Apple lists and outline views). */

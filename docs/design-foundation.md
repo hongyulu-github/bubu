@@ -18,13 +18,13 @@ The `apple-design` skill was run as a design review/improvement pass (platform: 
 | Radius scale | 6 (icon buttons, chips) / 10 (buttons, fields, menu items) / 14 (cards, menus, table) / 20 (dialogs) / full. Nested shapes step down one level. stdf's `--radius-form/box/small` are mapped onto the same scale | judgment, concentric corners |
 | Controls | 32px (28pt desktop default plus focus-ring room); 44px under `(pointer: coarse)`. Icon buttons 28px | `accessibility.md › Controls` |
 | Icon buttons | One accessible name each (`aria-label`), a tooltip with the shortcut on hover (after a delay) and on keyboard focus, dismissed by Escape; the tooltip is visual only so the name is not announced twice | `toolbars.md`, WCAG 1.4.13 |
-| Menus | "⋯" button and right-click open the same menu: icons, destructive item last and in the danger colour behind a separator, at most three groups, one level | `context-menus.md`, `menus.md` |
+| Menus | On Budget cards the "⋯" button and right-click open the same menu: icons, destructive item last and in the danger colour behind a separator, at most three groups, one level | `context-menus.md`, `menus.md` |
 | Toolbar | Undo/Redo and Collapse/Expand all as two icon groups (max three groups); text only where symbols are unclear | `toolbars.md › Item groupings` |
 | Colour | Starbucks palette, derived from the theme variables in light and dark; one colour, one meaning (accent for primary action and links, danger only for destructive); contrast checked in tests | `color.md` |
 
 New shared components (`src/lib/components`): `Icon`, `IconButton` (stdf `Button` underneath, plus tooltip), `Menu` (popover menu with arrow-key navigation), `MoreMenu`. stdf's own `Tooltip` (click only) and `ActionPopover` (no menu roles or keyboard handling) were not usable for the accessibility requirements, so those two behaviours are built here on the shared tokens.
 
-Editor: the table spans the window (page padding only), rows are compact, row actions are hover/focus icon buttons plus a right-click menu (touch screens keep them visible), "New item" is the last row, and the Budget name renames in place (double-click, or the pencil, which is the keyboard route).
+Editor: the table spans the window (page padding only), rows are compact, row actions are hover/focus icon buttons (touch screens keep them visible; no right-click menu in the table, so the browser menu works in cells), "New item" is the last row, and the Budget name renames in place (double-click, or the pencil, which is the keyboard route).
 
 ### Table hierarchy and cells (LUL-68 follow-up)
 
