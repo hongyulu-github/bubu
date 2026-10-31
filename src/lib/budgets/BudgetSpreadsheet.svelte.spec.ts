@@ -2075,16 +2075,23 @@ describe('scrolling layout: only the rows scroll', () => {
 		expect(cells.slice(0, headerCells().length)).toEqual(before);
 	});
 
-	it('darkens the separator under the header only once the content has scrolled, and above "New item" while rows hide below', async () => {
+	it('casts a shadow from the header only once the content has scrolled, and from "New item" while rows hide below', async () => {
 		open();
 		await vi.waitFor(() => expect(scroller().hasAttribute('data-more-below')).toBe(true));
 		expect(scroller().hasAttribute('data-scrolled')).toBe(false);
-		const resting = getComputedStyle(headerCells()[0]).borderBottomColor;
+		const edge = (element: Element, which: '::before' | '::after') => getComputedStyle(element, which);
+		const footer = () => newItem().element().closest('td')!;
+		expect(edge(headerCells()[0], '::after').content).toBe('none'); // nothing is beneath the header yet
 		scroller().scrollTop = 300;
 		await vi.waitFor(() => expect(scroller().hasAttribute('data-scrolled')).toBe(true));
-		expect(getComputedStyle(headerCells()[0]).borderBottomColor).not.toBe(resting); // the separator darkens
+		for (const th of headerCells()) {
+			expect(edge(th, '::after').backgroundImage, 'a shadow falls from every header cell').toContain('linear-gradient');
+			expect(edge(th, '::after').width).toBe(getComputedStyle(th).width); // full cell width: strips meet seamlessly
+		}
+		expect(edge(footer(), '::before').backgroundImage).toContain('linear-gradient'); // and rises from "New item" while rows hide below
 		scroller().scrollTop = scroller().scrollHeight;
 		await vi.waitFor(() => expect(scroller().hasAttribute('data-more-below')).toBe(false));
+		expect(getComputedStyle(newItem().element().closest('td')!, '::before').content).toBe('none'); // nothing left below: no shadow
 	});
 
 	it('scrolls a focused cell into view, clear of the fixed header and "New item" row', async () => {

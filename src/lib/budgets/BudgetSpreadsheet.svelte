@@ -340,14 +340,27 @@
 		border-top: 1px solid var(--color-border);
 	}
 
-	/* The separator under the header darkens once rows have scrolled beneath it, and the one above "New item"
-	   while more rows hide below it: a hairline, not a blurred shadow, so adjacent cells join up seamlessly. */
-	.scroll[data-scrolled] thead :global(th.cell) {
-		border-bottom-color: var(--color-border-strong);
+	/* A shadow falls from the header once rows have scrolled beneath it, and rises from the "New item" row while
+	   more rows hide below it: it reads as the bar lying above the content. Every cell carries a strip of the
+	   gradient across its full width, so the strips meet without gaps or doubled edges (a box-shadow per cell
+	   fades out at each cell's sides and looks blotchy). */
+	.scroll[data-scrolled] thead :global(th.cell)::after,
+	.scroll[data-more-below] tfoot :global(td)::before {
+		content: '';
+		position: absolute;
+		inset-inline: 0;
+		height: 0.75rem;
+		pointer-events: none;
 	}
 
-	.scroll[data-more-below] tfoot :global(td) {
-		border-top-color: var(--color-border-strong);
+	.scroll[data-scrolled] thead :global(th.cell)::after {
+		top: 100%;
+		background: linear-gradient(to bottom, var(--shadow-edge), transparent);
+	}
+
+	.scroll[data-more-below] tfoot :global(td)::before {
+		bottom: 100%;
+		background: linear-gradient(to top, var(--shadow-edge), transparent);
 	}
 
 	table {
