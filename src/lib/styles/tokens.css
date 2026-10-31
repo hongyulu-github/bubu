@@ -31,6 +31,7 @@
 	--color-disabled-text: color-mix(in oklch, var(--color-text-primary) 42%, var(--color-bg-surface));
 	--color-overlay: color-mix(in oklch, var(--color-text-primary) 45%, transparent);
 	--shadow-raised: 0 10px 30px color-mix(in oklch, var(--color-text-primary) 16%, transparent);
+	--shadow-edge: color-mix(in oklch, var(--color-text-primary) 35%, transparent);
 	--shadow-card: 0 2px 10px color-mix(in oklch, var(--color-text-primary) 9%, transparent);
 
 	/* Spacing (4px base) */
@@ -104,7 +105,8 @@
 		--color-disabled-text: color-mix(in oklch, var(--color-text-dark) 42%, var(--color-bg-surface-dark));
 		--color-overlay: color-mix(in oklch, black 60%, transparent);
 		--shadow-raised: 0 8px 30px color-mix(in oklch, black 50%, transparent);
-		--shadow-card: 0 2px 10px color-mix(in oklch, black 35%, transparent);
+		--shadow-edge: color-mix(in oklch, black 70%, transparent);
+	--shadow-card: 0 2px 10px color-mix(in oklch, black 35%, transparent);
 	}
 }
 
@@ -130,6 +132,7 @@
 	--color-disabled-text: color-mix(in oklch, var(--color-text-dark) 42%, var(--color-bg-surface-dark));
 	--color-overlay: color-mix(in oklch, black 60%, transparent);
 	--shadow-raised: 0 8px 30px color-mix(in oklch, black 50%, transparent);
+	--shadow-edge: color-mix(in oklch, black 70%, transparent);
 	--shadow-card: 0 2px 10px color-mix(in oklch, black 35%, transparent);
 }
 

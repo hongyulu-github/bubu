@@ -48,6 +48,27 @@
 	// DOM focus, so clicking an input with the mouse works the same way. `rows` is only what is visible,
 	// so collapsed descendants are skipped without any extra rule.
 	let table: HTMLTableElement | undefined = $state();
+
+	// The header row and the "New item" row stay put while the rows scroll between them. Their heights become
+	// scroll padding so keyboard focus never lands underneath them, and scroll position drives the shadows.
+	let headHeight = $state(0);
+	let footHeight = $state(0);
+	let scrolled = $state(false);
+	let moreBelow = $state(false);
+	let scroller: HTMLElement | undefined = $state();
+
+	function measureScroll() {
+		if (!scroller) return;
+		scrolled = scroller.scrollTop > 0;
+		moreBelow = Math.ceil(scroller.scrollTop + scroller.clientHeight) < scroller.scrollHeight;
+	}
+
+	$effect(() => {
+		void rows.length; // rows added or removed change what is below
+		void headHeight;
+		void footHeight;
+		measureScroll();
+	});
 	let active = $state.raw<(Cell & { index: number }) | null>(null);
 
 	/** Attributes that make a data cell a focusable grid cell with a roving tab stop. */
@@ -161,7 +182,15 @@
 	{/if}
 {/snippet}
 
-<div class="scroll">
+<div
+	class="scroll"
+	bind:this={scroller}
+	onscroll={measureScroll}
+	data-scrolled={scrolled ? '' : undefined}
+	data-more-below={moreBelow ? '' : undefined}
+	style:scroll-padding-top="{headHeight}px"
+	style:scroll-padding-bottom="{footHeight}px"
+>
 	<table role="grid" aria-label="Budget Items" bind:this={table} {onfocusin} {onkeydown}>
 		<colgroup>
 			<col style="width: 9.5rem" />
@@ -172,7 +201,7 @@
 			<col style="width: 8rem" />
 			{#if hasActions}<col style="width: 7.5rem" />{/if}
 		</colgroup>
-		<thead>
+		<thead bind:clientHeight={headHeight}>
 			<tr>
 				<TableCell header scope="col">Code</TableCell>
 				<TableCell header scope="col">Description</TableCell>
@@ -266,7 +295,7 @@
 				</tr>
 			{/each}
 		</tbody>
-		<tfoot>
+		<tfoot bind:clientHeight={footHeight}>
 			{#if onnewitem}
 				<tr class="new-row">
 					<td colspan={columnCount}>
@@ -283,14 +312,50 @@
 
 <style>
 	/* No box around the table: hairline row separators only (Apple lists and outline views). */
+	/* The scroll area fills the space its parent gives it (the editor page: the rest of the window) and is
+	   the only thing that scrolls. Header and footer rows are sticky inside it, so their columns are the
+	   rows' own columns and cannot drift. */
 	.scroll {
-		overflow-x: auto;
+		overflow: auto;
+		height: 100%;
+		min-height: 0;
+		container-type: inline-size; /* lets the "New item" button size itself to the visible width, not the table's */
+	}
+
+	/* Separate borders (not collapsed), so a sticky cell carries its own separator with it. Opaque
+	   backgrounds, so scrolling rows (and their translucent tints) never show through. */
+	thead :global(th.cell),
+	tfoot :global(td) {
+		position: sticky;
+		z-index: 2;
+		background: var(--color-bg);
+	}
+
+	thead :global(th.cell) {
+		top: 0;
+	}
+
+	tfoot :global(td) {
+		bottom: 0;
+		border-top: 1px solid var(--color-border);
+	}
+
+	/* The separator under the header darkens once rows have scrolled beneath it, and the one above "New item"
+	   while more rows hide below it: a hairline, not a blurred shadow, so adjacent cells join up seamlessly. */
+	.scroll[data-scrolled] thead :global(th.cell) {
+		border-bottom-color: var(--color-border-strong);
+	}
+
+	.scroll[data-more-below] tfoot :global(td) {
+		border-top-color: var(--color-border-strong);
 	}
 
 	table {
 		width: 100%;
-		min-width: 40rem;
-		border-collapse: collapse;
+		/* The fixed columns add up to 46rem; the rest is the Description, so it never gets squeezed away. */
+		min-width: 58rem;
+		border-collapse: separate;
+		border-spacing: 0;
 	}
 
 	.visually-hidden {
@@ -389,7 +454,11 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-2);
-		width: 100%;
+		/* Always as wide as the scroll area and pinned to its left edge, so on a narrow screen with a wide table it
+		   stays on screen and clickable instead of sitting at the centre of the whole table. */
+		position: sticky;
+		left: 0;
+		width: 100cqw;
 		min-height: var(--control-height);
 		padding: 0 var(--space-3);
 		border: none;

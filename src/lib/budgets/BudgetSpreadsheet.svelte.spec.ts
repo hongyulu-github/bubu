@@ -1994,3 +1994,159 @@ describe('hierarchy in the table', () => {
 		}
 	});
 });
+
+describe('scrolling layout: only the rows scroll', () => {
+	const many = (count = 60) => Array.from({ length: count }, (_, i) => item(i + 1, null, '10'));
+	const open = (items = many()) => {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	};
+	const scroller = () => document.querySelector<HTMLElement>('.scroll')!;
+	const rect = (element: Element) => element.getBoundingClientRect();
+	const headerCells = () => [...document.querySelectorAll<HTMLElement>('thead th')];
+	const newItem = () => page.getByRole('button', { name: 'New item', exact: true });
+	const rowCell = (code: string, index: number) => document.querySelectorAll(`tr[data-code="${code}"] td`)[index] as HTMLElement;
+
+	it('lets only the table area scroll: the page itself does not', async () => {
+		open();
+		await expect.element(newItem()).toBeVisible();
+		expect(scroller().scrollHeight).toBeGreaterThan(scroller().clientHeight); // the rows overflow their area...
+		expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(window.innerHeight); // ...the page does not
+		expect(getComputedStyle(document.querySelector('main')!).overflow).toBe('hidden');
+		scroller().scrollTop = 600;
+		window.scrollTo(0, 0);
+		expect(window.scrollY).toBe(0);
+	});
+
+	it('keeps the title, toolbar and column headers in view while the rows scroll', async () => {
+		open();
+		const heading = page.getByRole('heading', { name: 'Wedding' }).element();
+		const toolbar = page.getByRole('group', { name: 'History' }).element();
+		scroller().scrollTop = 900;
+		await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(0));
+		expect(rect(heading).top).toBeGreaterThanOrEqual(0);
+		expect(rect(toolbar).top).toBeGreaterThanOrEqual(0);
+		for (const th of headerCells()) {
+			expect(Math.round(rect(th).top), 'header sticks to the top of the scroll area').toBe(Math.round(rect(scroller()).top));
+		}
+	});
+
+	it('keeps the "New item" row fixed below the rows, always visible', async () => {
+		open();
+		for (const top of [0, 400, 1500]) {
+			scroller().scrollTop = top;
+			await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThanOrEqual(0));
+			const box = rect(newItem().element());
+			expect(box.bottom, `scrollTop ${top}`).toBeLessThanOrEqual(rect(scroller()).bottom + 1);
+			expect(box.top).toBeGreaterThanOrEqual(rect(scroller()).top);
+		}
+	});
+
+	it('keeps "New item" clickable on a narrow screen, even after scrolling the wide table sideways', async () => {
+		open();
+		expect(scroller().scrollWidth).toBeGreaterThan(scroller().clientWidth); // narrow window, wide table: it scrolls sideways
+		for (const left of [0, 250]) {
+			scroller().scrollLeft = left;
+			await vi.waitFor(() => expect(Math.round(scroller().scrollLeft)).toBe(left));
+			const box = rect(newItem().element());
+			expect(box.left, `scrollLeft ${left}`).toBeGreaterThanOrEqual(rect(scroller()).left - 1);
+			expect(box.right).toBeLessThanOrEqual(rect(scroller()).right + 1);
+		}
+		const before = document.querySelectorAll('tbody tr').length;
+		await newItem().click();
+		expect(document.querySelectorAll('tbody tr')).toHaveLength(before + 1);
+	});
+
+	it('leaves the Description column room to read even when the window is narrow', async () => {
+		open();
+		expect(rect(headerCells()[1]).width).toBeGreaterThanOrEqual(180);
+	});
+
+	it('keeps header columns aligned with the row columns while scrolling', async () => {
+		open();
+		const lefts = () => headerCells().map((th) => Math.round(rect(th).left));
+		const before = lefts();
+		scroller().scrollTop = 700;
+		await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(0));
+		const visible = [...document.querySelectorAll('tbody tr')].find((tr) => rect(tr).top > rect(headerCells()[0]).bottom)!;
+		const cells = [...visible.querySelectorAll('td')].map((td) => Math.round(rect(td).left));
+		expect(lefts()).toEqual(before);
+		expect(cells.slice(0, headerCells().length)).toEqual(before);
+	});
+
+	it('darkens the separator under the header only once the content has scrolled, and above "New item" while rows hide below', async () => {
+		open();
+		await vi.waitFor(() => expect(scroller().hasAttribute('data-more-below')).toBe(true));
+		expect(scroller().hasAttribute('data-scrolled')).toBe(false);
+		const resting = getComputedStyle(headerCells()[0]).borderBottomColor;
+		scroller().scrollTop = 300;
+		await vi.waitFor(() => expect(scroller().hasAttribute('data-scrolled')).toBe(true));
+		expect(getComputedStyle(headerCells()[0]).borderBottomColor).not.toBe(resting); // the separator darkens
+		scroller().scrollTop = scroller().scrollHeight;
+		await vi.waitFor(() => expect(scroller().hasAttribute('data-more-below')).toBe(false));
+	});
+
+	it('scrolls a focused cell into view, clear of the fixed header and "New item" row', async () => {
+		open();
+		const header = rect(headerCells()[0]);
+		for (const code of ['30', '60', '1']) {
+			rowCell(code, 1).focus();
+			await vi.waitFor(() => {
+				const box = rect(rowCell(code, 1));
+				expect(box.top, `row ${code} below the header`).toBeGreaterThanOrEqual(header.bottom - 1);
+				expect(box.bottom, `row ${code} above New item`).toBeLessThanOrEqual(rect(newItem().element()).top + 1);
+			});
+		}
+	});
+
+	it('keeps the focus visible while arrowing down past the bottom edge', async () => {
+		open();
+		rowCell('1', 1).focus();
+		for (let i = 0; i < 45; i++) await userEvent.keyboard('{ArrowDown}');
+		const active = document.activeElement as HTMLElement;
+		expect(active.getAttribute('data-cell')).toContain('description');
+		const box = rect(active);
+		expect(box.top).toBeGreaterThanOrEqual(rect(headerCells()[0]).bottom - 1);
+		expect(box.bottom).toBeLessThanOrEqual(rect(newItem().element()).top + 1);
+	});
+
+	it('scrolls to the new row and focuses it when an item is added', async () => {
+		const store = open();
+		scroller().scrollTop = 0;
+		await newItem().click();
+		const added = store.rows.at(-1)!;
+		const input = document.querySelector<HTMLInputElement>(`tr[data-item-id="${added.id}"] input`)!;
+		await expect.element(input).toHaveFocus();
+		await vi.waitFor(() => {
+			const box = rect(input);
+			expect(box.top).toBeGreaterThanOrEqual(rect(headerCells()[0]).bottom - 1);
+			expect(box.bottom).toBeLessThanOrEqual(rect(newItem().element()).top + 1);
+		});
+		expect(scroller().scrollTop).toBeGreaterThan(0);
+	});
+
+	it('does not need to scroll for a short Budget: the rows sit under the header with "New item" after them', async () => {
+		open(many(3));
+		expect(scroller().scrollHeight).toBeLessThanOrEqual(scroller().clientHeight + 1);
+		expect(scroller().hasAttribute('data-scrolled')).toBe(false);
+		expect(rect(newItem().element()).top).toBeGreaterThan(rect(rowCell('3', 1)).bottom - 1);
+	});
+
+	it.each<Theme>(['light', 'dark'])('has opaque sticky rows so scrolling content never shows through in %s', async (theme) => {
+		setTheme(theme);
+		open();
+		for (const element of [headerCells()[0], newItem().element().closest('td')!]) {
+			const colour = getComputedStyle(element).backgroundColor;
+			expect(colour).not.toBe('rgba(0, 0, 0, 0)');
+			expect(alphaOf(colour)).toBe(1);
+		}
+	});
+});
+
+function alphaOf(colour: string): number {
+	const slash = colour.match(/\/\s*([\d.]+)/);
+	if (slash) return Number(slash[1]);
+	const rgba = colour.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
+	return rgba ? Number(rgba[1]) : 1;
+}

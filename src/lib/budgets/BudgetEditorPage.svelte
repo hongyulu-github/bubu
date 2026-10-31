@@ -65,7 +65,9 @@
 	/** Move the cursor to the new row's Description so the user can type straight away. */
 	async function focusDescription(itemId: string) {
 		await tick();
-		document.querySelector<HTMLInputElement>(`tr[data-item-id="${itemId}"] input`)?.focus();
+		const input = document.querySelector<HTMLInputElement>(`tr[data-item-id="${itemId}"] input`);
+		input?.focus();
+		input?.scrollIntoView({ block: 'nearest' }); // inside the scroll area, clear of the sticky rows (scroll-padding)
 	}
 
 	/** The deleted row (and the control that opened any dialog) is gone, so put focus somewhere stable. */
@@ -191,17 +193,19 @@
 				{/if}
 			</div>
 
-			<BudgetSpreadsheet
-				rows={shownRows}
-				currency={budget.currency}
-				{collapsed}
-				ontoggle={(groupId) => (collapsed = toggleCollapsed(collapsed, groupId))}
-				onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
-				onadd={addBelow}
-				ondelete={requestDelete}
-				onaddchild={requestAddChild}
-				onnewitem={addTopLevel}
-			/>
+			<div class="table-area">
+				<BudgetSpreadsheet
+					rows={shownRows}
+					currency={budget.currency}
+					{collapsed}
+					ontoggle={(groupId) => (collapsed = toggleCollapsed(collapsed, groupId))}
+					onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
+					onadd={addBelow}
+					ondelete={requestDelete}
+					onaddchild={requestAddChild}
+					onnewitem={addTopLevel}
+				/>
+			</div>
 		{/if}
 	{:else if loadFailure}
 		<h1>This Budget could not be loaded</h1>
@@ -214,6 +218,11 @@
 
 <style>
 	main {
+		/* The editor fills the window and the page itself never scrolls: title and toolbar stay put, and the
+		   table area below takes the rest, scrolling its rows only. */
+		height: 100dvh;
+		overflow: hidden;
+		position: relative; /* so absolutely positioned bits (visually hidden labels) are clipped with it, not stretching the page */
 		/* The table uses the whole window; only the page padding frames it. */
 		padding: var(--space-5);
 		display: flex;
@@ -253,6 +262,11 @@
 		align-items: flex-end;
 		justify-content: space-between;
 		gap: var(--space-4);
+	}
+
+	.table-area {
+		flex: 1;
+		min-height: 0;
 	}
 
 	.toolbar {
