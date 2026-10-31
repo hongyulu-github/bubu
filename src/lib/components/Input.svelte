@@ -49,13 +49,13 @@
 
 	label {
 		font-size: var(--font-size-callout);
-		font-weight: var(--font-weight-medium);
+		font-weight: var(--font-weight-semibold);
 		color: var(--color-text);
 	}
 
 	input {
 		min-height: var(--control-height);
-		padding: 0 var(--space-4);
+		padding: 0 var(--space-3);
 		border: 1px solid var(--color-border-strong);
 		border-radius: var(--radius-md);
 		background: var(--color-surface);

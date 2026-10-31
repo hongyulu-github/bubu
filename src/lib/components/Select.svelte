@@ -21,6 +21,7 @@
 
 <div class="field">
 	<label for={id}>{label}</label>
+	<div class="control">
 	<select
 		{id}
 		bind:value
@@ -36,6 +37,8 @@
 			<option value={option.value}>{option.label}</option>
 		{/each}
 	</select>
+	<span class="chevron" aria-hidden="true"></span>
+	</div>
 	{#if hint}
 		<p class="hint" id={hintId}>{hint}</p>
 	{/if}
@@ -51,18 +54,40 @@
 
 	label {
 		font-size: var(--font-size-callout);
-		font-weight: var(--font-weight-medium);
+		font-weight: var(--font-weight-semibold);
 		color: var(--color-text);
 	}
 
+	.control {
+		position: relative;
+		display: flex;
+	}
+
+	/* Same look as Input: surface fill, one border, the shared radius; the platform arrow is replaced. */
 	select {
+		appearance: none;
+		width: 100%;
 		min-height: var(--control-height);
-		padding: 0 var(--space-4);
+		padding: 0 calc(var(--space-3) + 1.5rem) 0 var(--space-3);
 		border: 1px solid var(--color-border-strong);
 		border-radius: var(--radius-md);
 		background: var(--color-surface);
 		color: var(--color-text);
 		font: inherit;
+		cursor: pointer;
+	}
+
+	.chevron {
+		position: absolute;
+		inset-block: 0;
+		inset-inline-end: var(--space-3);
+		width: 0.45rem;
+		height: 0.45rem;
+		margin-block: auto;
+		border-right: 2px solid var(--color-text-secondary);
+		border-bottom: 2px solid var(--color-text-secondary);
+		transform: translateY(-25%) rotate(45deg);
+		pointer-events: none;
 	}
 
 	select:focus-visible {
@@ -72,6 +97,10 @@
 
 	select[aria-invalid='true'] {
 		border-color: var(--color-danger);
+	}
+
+	select:disabled ~ .chevron {
+		border-color: var(--color-disabled-text);
 	}
 
 	select:disabled {

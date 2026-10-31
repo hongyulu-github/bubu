@@ -4,7 +4,6 @@ export { default as Input } from './Input.svelte';
 export { default as NumberInput } from './NumberInput.svelte';
 export { default as Select } from './Select.svelte';
 export { default as TableCell } from './TableCell.svelte';
-export { default as TextField } from './TextField.svelte';
 export { default as Icon, type IconName } from './Icon.svelte';
 export { default as IconButton } from './IconButton.svelte';
 export { default as Menu, type MenuItem } from './Menu.svelte';

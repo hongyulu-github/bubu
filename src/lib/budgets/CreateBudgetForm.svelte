@@ -4,7 +4,7 @@
 	import { CURRENCIES } from '../budget/currencies';
 	import { validateBudgetForm, type BudgetFormErrors } from '../budget/create';
 	import Button from '../components/Button.svelte';
-	import TextField from '../components/TextField.svelte';
+	import Input from '../components/Input.svelte';
 	import Select from '../components/Select.svelte';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 
@@ -42,12 +42,13 @@
 <main>
 	<h1>New Budget</h1>
 	<form bind:this={form} novalidate onsubmit={submit}>
-		<TextField label="Name" bind:value={name} error={errors.name} />
+		<Input label="Name" bind:value={name} error={errors.name} autocomplete="off" />
 		<Select
 			label="Currency"
 			bind:value={currency}
 			options={currencyOptions}
 			placeholder="Choose a currency"
+			hint="Amounts in this Budget are shown in this currency."
 			error={errors.currency}
 		/>
 		<div class="actions">
@@ -70,13 +71,15 @@
 	h1 {
 		margin: 0;
 		font-size: var(--font-size-display);
+		font-weight: var(--font-weight-bold);
 		line-height: var(--line-height-tight);
+		letter-spacing: -0.01em;
 	}
 
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-4);
+		gap: var(--space-3);
 	}
 
 	.actions {
@@ -84,10 +87,13 @@
 		align-items: center;
 		justify-content: flex-end;
 		gap: var(--space-4);
+		margin-top: var(--space-2);
 	}
 
 	.cancel {
 		color: var(--color-accent);
+		font-size: var(--font-size-callout);
+		font-weight: var(--font-weight-semibold);
 		text-decoration: none;
 	}
 

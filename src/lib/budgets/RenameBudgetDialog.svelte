@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import Button from '../components/Button.svelte';
 	import Dialog from '../components/Dialog.svelte';
-	import TextField from '../components/TextField.svelte';
+	import Input from '../components/Input.svelte';
 	import { validateBudgetName } from '../budget/create';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 
@@ -44,7 +44,7 @@
 
 <Dialog bind:open title="Rename Budget" description="The name changes; your Items stay exactly as they are.">
 	<form id={formId} bind:this={form} novalidate onsubmit={save}>
-		<TextField label="Name" bind:value={name} {error} />
+		<Input label="Name" bind:value={name} {error} autocomplete="off" />
 	</form>
 	{#snippet footer()}
 		<Button onclick={() => (open = false)}>Cancel</Button>
