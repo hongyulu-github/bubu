@@ -76,7 +76,7 @@
 		width: min(28rem, calc(100vw - var(--space-6)));
 		padding: 0;
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
+		border-radius: var(--radius-xl);
 		background: var(--color-surface);
 		color: var(--color-text);
 		box-shadow: var(--shadow-raised);

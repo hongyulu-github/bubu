@@ -8,6 +8,24 @@
 
 Apple-inspired visual foundation for BuBu: CSS tokens plus five base Svelte 5 components.
 
+## LUL-68 redesign (Apple design skill applied to the stdf Cherry theme)
+
+The `apple-design` skill was run as a design review/improvement pass (platform: desktop-first web app; references read: `accessibility`, `layout`, `typography`, `color`, `buttons`, `menus`, `context-menus`, `toolbars`, `lists-and-tables`, `designing-for-macos`). Decisions, all expressed as tokens in `src/lib/styles/tokens.css` (and applied to stdf through `src/lib/styles/stdf.css`):
+
+| Area | Decision | Source |
+| --- | --- | --- |
+| Type scale | caption 11, footnote 12, callout 13, body 14, title3 15, title2 17, title 22, large title 26 px; bold for titles, semibold for emphasis. Body is 14px, one step above macOS's 13pt, as a web judgment; nothing is below the 11pt minimum | `typography.md › macOS built-in text styles` |
+| Radius scale | 6 (icon buttons, chips) / 10 (buttons, fields, menu items) / 14 (cards, menus, table) / 20 (dialogs) / full. Nested shapes step down one level. stdf's `--radius-form/box/small` are mapped onto the same scale | judgment, concentric corners |
+| Controls | 32px (28pt desktop default plus focus-ring room); 44px under `(pointer: coarse)`. Icon buttons 28px | `accessibility.md › Controls` |
+| Icon buttons | One accessible name each (`aria-label`), a tooltip with the shortcut on hover (after a delay) and on keyboard focus, dismissed by Escape; the tooltip is visual only so the name is not announced twice | `toolbars.md`, WCAG 1.4.13 |
+| Menus | "⋯" button and right-click open the same menu: icons, destructive item last and in the danger colour behind a separator, at most three groups, one level | `context-menus.md`, `menus.md` |
+| Toolbar | Undo/Redo and Collapse/Expand all as two icon groups (max three groups); text only where symbols are unclear | `toolbars.md › Item groupings` |
+| Colour | Cherry palette; one colour, one meaning (accent for primary action and links, danger only for destructive); contrast checked in tests | `color.md` |
+
+New shared components (`src/lib/components`): `Icon`, `IconButton` (stdf `Button` underneath, plus tooltip), `Menu` (popover menu with arrow-key navigation), `MoreMenu`. stdf's own `Tooltip` (click only) and `ActionPopover` (no menu roles or keyboard handling) were not usable for the accessibility requirements, so those two behaviours are built here on the shared tokens.
+
+Editor: the table spans the window (page padding only), rows are compact, row actions are hover/focus icon buttons plus a right-click menu (touch screens keep them visible), "New item" is the last row, and the Budget name renames in place (double-click, or the pencil, which is the keyboard route).
+
 ## Source and license
 
 - **Design reference:** [`dickwu/apple-design-skill`](https://github.com/dickwu/apple-design-skill), an agent skill that reviews UI against Apple's Human Interface Guidelines (HIG).

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import Button from '../components/Button.svelte';
+	import Menu, { type MenuItem } from '../components/Menu.svelte';
+	import MoreMenu from '../components/MoreMenu.svelte';
 	import type { Budget } from '../budget/model';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import ConfirmDeleteBudgetDialog from './ConfirmDeleteBudgetDialog.svelte';
+	import RenameBudgetDialog from './RenameBudgetDialog.svelte';
 
 	let { store = budgetStore }: { store?: BudgetStore } = $props();
 
@@ -46,6 +48,37 @@
 		document.querySelector<HTMLElement>(`a[href="/budgets/${result.budget.id}"]`)?.focus();
 	}
 
+	let renamingId = $state<string | null>(null);
+	let renaming = $state(false);
+	let contextMenu = $state<{ x: number; y: number; budget: Budget } | null>(null);
+
+	/** One list of actions, used by the "⋯" button on each card and by its right-click menu. */
+	function actionsFor(budget: Budget): MenuItem[] {
+		return [
+			{
+				id: 'rename',
+				label: 'Rename',
+				icon: 'pencil',
+				onselect: () => {
+					renamingId = budget.id;
+					renaming = true;
+				}
+			},
+			{ id: 'duplicate', label: 'Duplicate', icon: 'copy', onselect: () => duplicate(budget.id, budget.name) },
+			{ id: 'delete', label: 'Delete', icon: 'trash', destructive: true, separatorBefore: true, onselect: () => requestDelete(budget) }
+		];
+	}
+
+	function oncontextmenu(event: MouseEvent, budget: Budget) {
+		event.preventDefault();
+		contextMenu = { x: event.clientX, y: event.clientY, budget };
+	}
+
+	const itemsLabel = (budgetId: string) => {
+		const count = store.itemsOf(budgetId).length;
+		return `${count} ${count === 1 ? 'item' : 'items'}`;
+	};
+
 	const unreadable = $derived(store.loadIssues.filter((issue) => issue.budgetId !== undefined));
 </script>
 
@@ -80,18 +113,30 @@
 		{:else}
 			<ul>
 				{#each budgets as budget (budget.id)}
-					<li>
+					<li oncontextmenu={(event) => oncontextmenu(event, budget)}>
 						<a href="/budgets/{budget.id}">
 							<span class="name">{budget.name}</span>
-							<span class="currency">{budget.currency}</span>
+							<span class="meta">
+								<span class="currency">{budget.currency}</span>
+								<span class="count">{itemsLabel(budget.id)}</span>
+							</span>
 						</a>
-						<Button compact aria-label="Duplicate {budget.name}" onclick={() => duplicate(budget.id, budget.name)}>
-							Duplicate
-						</Button>
-						<Button compact aria-label="Delete {budget.name}" onclick={() => requestDelete(budget)}>Delete</Button>
+						<MoreMenu label="Actions for {budget.name}" items={actionsFor(budget)} />
 					</li>
 				{/each}
 			</ul>
+		{/if}
+
+		{#if renamingId}
+			<RenameBudgetDialog budgetId={renamingId} bind:open={renaming} {store} />
+		{/if}
+		{#if contextMenu}
+			<Menu
+				items={actionsFor(contextMenu.budget)}
+				label="Actions for {contextMenu.budget.name}"
+				anchor={{ x: contextMenu.x, y: contextMenu.y }}
+				onclose={() => (contextMenu = null)}
+			/>
 		{/if}
 	{/if}
 </main>
@@ -116,18 +161,21 @@
 	h1 {
 		margin: 0;
 		font-size: var(--font-size-display);
+		font-weight: var(--font-weight-bold);
 		line-height: var(--line-height-tight);
+		letter-spacing: -0.01em;
 	}
 
 	.new {
 		display: inline-flex;
 		align-items: center;
 		min-height: var(--control-height);
-		padding: 0 var(--space-5);
+		padding: 0 var(--space-4);
 		border-radius: var(--radius-md);
 		background: var(--color-accent);
 		color: var(--color-on-accent);
-		font-weight: var(--font-weight-medium);
+		font-size: var(--font-size-callout);
+		font-weight: var(--font-weight-semibold);
 		text-decoration: none;
 	}
 
@@ -145,27 +193,31 @@
 		gap: var(--space-3);
 	}
 
+	/* A card: the title leads, the quiet details sit underneath, the actions wait behind "⋯". */
 	li {
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
-		padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+		padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-lg);
 		background: var(--color-surface);
+		transition:
+			border-color var(--duration-fast),
+			box-shadow var(--duration-fast);
 	}
 
 	li:hover {
 		border-color: var(--color-border-strong);
+		box-shadow: var(--shadow-card);
 	}
 
 	ul a {
 		display: flex;
 		flex: 1;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-4);
-		min-height: var(--control-height);
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
 		color: var(--color-text);
 		text-decoration: none;
 	}
@@ -173,16 +225,33 @@
 	ul a:focus-visible {
 		outline: var(--focus-ring-width) solid var(--color-focus-ring);
 		outline-offset: var(--focus-ring-offset);
+		border-radius: var(--radius-sm);
 	}
 
 	.name {
-		font-weight: var(--font-weight-medium);
+		font-size: var(--font-size-title2);
+		font-weight: var(--font-weight-bold);
+		line-height: var(--line-height-tight);
+		letter-spacing: -0.005em;
+		overflow-wrap: anywhere;
 	}
 
-	.currency {
+	.meta {
+		display: flex;
+		gap: var(--space-2);
 		color: var(--color-text-secondary);
 		font-size: var(--font-size-callout);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.currency {
+		font-weight: var(--font-weight-medium);
+		color: var(--color-accent);
+	}
+
+	.count::before {
+		content: '·';
+		margin-inline-end: var(--space-2);
 	}
 
 	.visually-hidden {

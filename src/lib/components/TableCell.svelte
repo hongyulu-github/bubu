@@ -53,9 +53,10 @@
 
 <style>
 	.cell {
-		padding: var(--space-3) var(--space-4);
-		padding-inline-start: calc(var(--space-4) + min(var(--cell-depth, 0) * var(--space-5), 12rem));
+		padding: var(--space-1) var(--space-3);
+		padding-inline-start: calc(var(--space-3) + min(var(--cell-depth, 0) * var(--space-5), 12rem));
 		border-bottom: 1px solid var(--color-border);
+		font-size: var(--font-size-callout);
 		text-align: start;
 		font-weight: var(--font-weight-regular);
 		color: var(--color-text);
@@ -64,6 +65,7 @@
 	th.cell {
 		font-size: var(--font-size-footnote);
 		font-weight: var(--font-weight-semibold);
+		letter-spacing: 0.01em;
 		color: var(--color-text-secondary);
 	}
 

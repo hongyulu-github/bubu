@@ -102,7 +102,7 @@
 	}
 
 	.compact input {
-		min-height: 2.25rem;
+		min-height: var(--icon-button-size);
 		padding: 0 var(--space-2);
 		border-color: transparent;
 		border-radius: var(--radius-sm);

@@ -181,8 +181,8 @@ describe('Budget root and grand total', () => {
 		await expect.element(page.getByRole('heading', { name: 'Wedding' })).toBeVisible();
 		await expect.element(page.getByText('DKK', { exact: true })).toBeVisible();
 		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('DKK 0.00');
-		await expect.element(page.getByText('This Budget has no Items yet.')).toBeVisible();
-		expect(document.querySelector('table')).toBeNull();
+		expect(document.querySelectorAll('tbody tr')).toHaveLength(0);
+		await expect.element(page.getByRole('button', { name: 'New item', exact: true })).toBeVisible(); // the table is just its "New item" row
 	});
 
 	it('shows the grand total of the top-level Totals and the table', async () => {
@@ -373,23 +373,22 @@ describe('adding Items', () => {
 
 	it('adds the first Item to an empty Budget with the defaults and focuses its Description', async () => {
 		editor([]);
-		await expect.element(page.getByText('This Budget has no Items yet.')).toBeVisible();
+		expect(document.querySelectorAll('tbody tr')).toHaveLength(0);
 		await expect.element(grandTotal()).toHaveTextContent('€0.00');
 
-		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByRole('button', { name: 'New item', exact: true }).click();
 
 		await expect.element(page.getByRole('grid', { name: 'Budget Items' })).toBeVisible();
 		expect(codes()).toEqual(['1']);
 		expect(table()).toEqual([['1', '', '1', '', '0', '€0.00']]); // empty Description, Quantity 1, Unit price 0 (an input), Total 0
 		await expect.element(page.getByLabelText('Description 1', { exact: true })).toHaveFocus();
 		await expect.element(grandTotal()).toHaveTextContent('€0.00');
-		expect(document.body.textContent).not.toContain('This Budget has no Items yet.');
 	});
 
 	it('adds top-level Items one after another in insertion order', async () => {
 		editor(nested());
-		await page.getByRole('button', { name: 'Add item', exact: true }).click();
-		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByRole('button', { name: 'New item', exact: true }).click();
+		await page.getByRole('button', { name: 'New item', exact: true }).click();
 		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2', '2', '3']);
 		await expect.element(grandTotal()).toHaveTextContent('€134.00');
 	});
@@ -573,7 +572,7 @@ describe('deleting Items', () => {
 	it('puts focus somewhere stable after a deletion', async () => {
 		editor(nested());
 		await page.getByRole('button', { name: 'Delete 1.2', exact: true }).click();
-		await expect.element(page.getByRole('button', { name: 'Add item', exact: true })).toHaveFocus();
+		await expect.element(page.getByRole('button', { name: 'New item', exact: true })).toHaveFocus();
 	});
 
 	it('uses the singular for a Group with one item inside', async () => {
@@ -1468,9 +1467,9 @@ describe('keyboard navigation and editing', () => {
 
 		it('does not take focus when it was never in the grid', async () => {
 			const store = editor();
-			page.getByRole('button', { name: 'Add item', exact: true }).element().focus();
+			page.getByRole('button', { name: 'New item', exact: true }).element().focus();
 			store.editItem(BUDGET, uuid(3), 'quantity', '2');
-			await expect.element(page.getByRole('button', { name: 'Add item', exact: true })).toHaveFocus();
+			await expect.element(page.getByRole('button', { name: 'New item', exact: true })).toHaveFocus();
 		});
 	});
 
@@ -1572,7 +1571,7 @@ describe('undo and redo shortcuts', () => {
 		it('undoes and redoes adding an Item', async () => {
 			const store = editor();
 			const before = rowIds();
-			await page.getByRole('button', { name: 'Add item', exact: true }).click();
+			await page.getByRole('button', { name: 'New item', exact: true }).click();
 			(document.activeElement as HTMLElement).blur();
 			const after = rowIds();
 			expect(after).toHaveLength(before.length + 1);
@@ -1626,7 +1625,7 @@ describe('undo and redo shortcuts', () => {
 
 		it('restores focus to a sensible cell when undo removes the row it was on', async () => {
 			editor();
-			await page.getByRole('button', { name: 'Add item', exact: true }).click();
+			await page.getByRole('button', { name: 'New item', exact: true }).click();
 			const added = rowIds().at(-1)!;
 			cell(codes().at(-1)!, 'quantity').focus();
 			await undo();
@@ -1694,19 +1693,19 @@ describe('undo and redo shortcuts', () => {
 			expect(itemOf(store, 3).quantity).toBe('5');
 		});
 
-		it('leaves a dialog field to the browser, and does not undo behind an open dialog', async () => {
+		it('leaves the title field to the browser while it is being edited, and does not undo behind it', async () => {
 			const store = editor();
 			await commit('Quantity 1.1.1', '5');
-			await page.getByRole('button', { name: 'Rename' }).click();
-			await page.getByLabelText('Name', { exact: true }).fill('Typed in the dialog');
+			await page.getByRole('button', { name: 'Rename Budget' }).click();
+			await page.getByLabelText('Budget name').fill('Typed in the title');
 			const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
 			document.activeElement!.dispatchEvent(event);
 			expect(event.defaultPrevented).toBe(false);
 			expect(itemOf(store, 3).quantity).toBe('5');
 
-			await page.getByRole('button', { name: 'Cancel' }).click();
+			await userEvent.keyboard('{Escape}');
 			await undo();
-			expect(itemOf(store, 3).quantity).toBe('1'); // normal again once the dialog is closed
+			expect(itemOf(store, 3).quantity).toBe('1'); // normal again once the title edit is over
 		});
 	});
 
@@ -1770,5 +1769,131 @@ describe('undo and redo shortcuts', () => {
 			await undo();
 			expect(itemOf(store, 3).quantity).toBe('5');
 		});
+	});
+});
+
+describe('row actions as icons and a context menu', () => {
+	function editor(items: Item[] = nested()) {
+		const store = openStore(items);
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		return store;
+	}
+	const codes = () => [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-code'));
+	const row = (code: string) => document.querySelector<HTMLElement>(`tr[data-code="${code}"]`)!;
+	const actions = (code: string) => row(code).querySelector<HTMLElement>('.actions')!;
+	const rightClick = (target: Element) =>
+		target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 120 }));
+	const menu = (code: string) => page.getByRole('menu', { name: `Actions for ${code}` });
+
+	it('has no visible text buttons per row: three icon buttons, each named for its row', async () => {
+		editor();
+		const buttons = [...actions('1.2').querySelectorAll('button')];
+		expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual(['Add item below 1.2', 'Add child to 1.2', 'Delete 1.2']);
+		expect(buttons.map((button) => button.textContent?.trim())).toEqual(['', '', '']);
+	});
+
+	it('shows the row actions on hover and on keyboard focus, and hides them otherwise', async () => {
+		editor();
+		await userEvent.hover(document.body); // a pointer left over from an earlier test must not count as hover
+		await vi.waitFor(() => expect(getComputedStyle(actions('1.2')).opacity).toBe('0'));
+
+		await page.getByRole('button', { name: 'Delete 1.2', exact: true }).hover();
+		await vi.waitFor(() => expect(getComputedStyle(actions('1.2')).opacity).toBe('1'));
+
+		await userEvent.hover(document.body);
+		await vi.waitFor(() => expect(getComputedStyle(actions('1.2')).opacity).toBe('0'));
+
+		page.getByRole('button', { name: 'Add child to 1.2', exact: true }).element().focus();
+		await vi.waitFor(() => expect(getComputedStyle(actions('1.2')).opacity).toBe('1')); // reachable by keyboard
+	});
+
+	it('opens a context menu on right-click with the same actions, Delete last and marked', async () => {
+		editor();
+		rightClick(row('1.2').querySelector('[data-cell$="|description"]')!);
+		await expect.element(menu('1.2')).toBeVisible();
+		const items = [...menu('1.2').element().querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim());
+		expect(items).toEqual(['Add item below', 'Add child', 'Delete']);
+		await expect.element(page.getByRole('menuitem', { name: 'Add item below' })).toHaveFocus();
+	});
+
+	it('runs the chosen action on the right-clicked row', async () => {
+		const store = editor();
+		const before = codes().length;
+		rightClick(row('1.2').querySelector('[data-cell$="|code"]')!);
+		await page.getByRole('menuitem', { name: 'Add item below' }).click();
+		expect(codes()).toHaveLength(before + 1);
+		expect(store.canUndo(BUDGET)).toBe(true);
+
+		rightClick(row('1.1.1').querySelector('[data-cell$="|total"]')!);
+		await page.getByRole('menuitem', { name: 'Delete' }).click();
+		expect(codes()).not.toContain('1.1.2');
+	});
+
+	it('closes on Escape without doing anything', async () => {
+		editor();
+		const before = codes();
+		rightClick(row('1').querySelector('[data-cell$="|code"]')!);
+		await expect.element(menu('1')).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(menu('1')).not.toBeInTheDocument();
+		expect(codes()).toEqual(before);
+	});
+
+	it('leaves the browser menu alone inside a cell input (cut, copy, paste)', async () => {
+		editor();
+		const input = page.getByLabelText('Description 1.2', { exact: true }).element();
+		const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+		input.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+		expect(document.querySelector('[role="menu"]')).toBeNull();
+	});
+});
+
+describe('the "New item" row', () => {
+	it('is the last row of the table, with a plus icon, and adds a top-level Item inline', async () => {
+		const store = openStore(nested());
+		render(BudgetEditorPage, { budgetId: BUDGET, store });
+		const add = page.getByRole('button', { name: 'New item', exact: true });
+		await expect.element(add).toBeVisible();
+		expect(add.element().querySelector('svg')).not.toBeNull();
+		expect(add.element().closest('tfoot')).not.toBeNull(); // after every Item row
+		const before = store.rows.length;
+		await add.click();
+		expect(store.rows.length).toBe(before + 1);
+		expect(document.querySelectorAll('tbody tr')).toHaveLength(before + 1);
+	});
+
+	it('replaces the old "Add item" button and the "Rename" text button', async () => {
+		render(BudgetEditorPage, { budgetId: BUDGET, store: openStore(nested()) });
+		expect(page.getByRole('button', { name: 'Add item', exact: true }).elements()).toHaveLength(0);
+		expect(page.getByRole('button', { name: 'Rename', exact: true }).elements()).toHaveLength(0);
+	});
+});
+
+describe('the compact icon toolbar', () => {
+	it('keeps Undo, Redo, Collapse all and Expand all as named icon buttons with shortcut hints', async () => {
+		render(BudgetEditorPage, { budgetId: BUDGET, store: openStore(nested()) });
+		for (const name of ['Undo', 'Redo', 'Collapse all', 'Expand all']) {
+			const button = page.getByRole('button', { name, exact: true });
+			await expect.element(button).toBeVisible();
+			expect(button.element().textContent?.trim()).toBe('');
+		}
+		await expect.element(page.getByRole('button', { name: 'Undo' })).toHaveAttribute('aria-keyshortcuts', 'Control+Z Meta+Z');
+		await expect.element(page.getByRole('button', { name: 'Redo' })).toHaveAttribute('aria-keyshortcuts', 'Control+Shift+Z Meta+Shift+Z');
+		const height = page.getByRole('button', { name: 'Undo' }).element().getBoundingClientRect().height;
+		expect(height).toBeLessThanOrEqual(36); // compact, not a 44px text button
+	});
+
+	it('uses the full width of the window for the table', async () => {
+		render(BudgetEditorPage, { budgetId: BUDGET, store: openStore(nested()) });
+		const main = document.querySelector('main')!.getBoundingClientRect();
+		const scroll = document.querySelector('.scroll')!.getBoundingClientRect();
+		expect(scroll.width).toBeGreaterThan(main.width - 80); // only the page padding is left over
+	});
+
+	it('has compact rows', async () => {
+		render(BudgetEditorPage, { budgetId: BUDGET, store: openStore(nested()) });
+		const row = document.querySelector('tbody tr')!.getBoundingClientRect();
+		expect(row.height).toBeLessThanOrEqual(40);
 	});
 });

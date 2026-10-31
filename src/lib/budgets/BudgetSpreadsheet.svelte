@@ -12,7 +12,9 @@
 	} from '../budget/grid';
 	import { formatMoney } from '../budget/currency';
 	import { toString } from '../budget/numbers';
-	import Button from '../components/Button.svelte';
+	import Icon from '../components/Icon.svelte';
+	import IconButton from '../components/IconButton.svelte';
+	import Menu, { type MenuItem } from '../components/Menu.svelte';
 	import TableCell from '../components/TableCell.svelte';
 	import type { BudgetRow } from '../state/budgets.svelte';
 	import ItemCellEditor from './ItemCellEditor.svelte';
@@ -32,13 +34,15 @@
 		ondelete?: (itemId: string) => void;
 		/** Add a child inside this Item (a Line becomes a Group). Shows a row action when given. */
 		onaddchild?: (parentId: string) => void;
+		/** Add a top-level Item. Shows the "New item" row at the end of the table when given. */
+		onnewitem?: () => void;
 		/** Ids of collapsed Groups, for the toggles' state. The caller passes only the rows to show. */
 		collapsed?: ReadonlySet<string>;
 		/** Collapse or expand a Group. Shows a toggle on every Group row when given. */
 		ontoggle?: (groupId: string) => void;
 	}
 
-	let { rows, currency, onedit, onadd, ondelete, onaddchild, collapsed = new Set<string>(), ontoggle }: Props = $props();
+	let { rows, currency, onedit, onadd, ondelete, onaddchild, onnewitem, collapsed = new Set<string>(), ontoggle }: Props = $props();
 
 	// --- Keyboard: which cell is active, and whether it is being edited -----------------------------
 	// Navigation focuses the cell itself; editing focuses the input inside it. Both are read from real
@@ -137,6 +141,27 @@
 		hadFocus = false;
 	});
 	const hasActions = $derived(onadd !== undefined || ondelete !== undefined || onaddchild !== undefined);
+	const columnCount = $derived(6 + (hasActions ? 1 : 0));
+
+	// The same row actions, in a right-click (or keyboard context-menu key) menu. Typing fields keep the
+	// browser's own menu for cut, copy and paste.
+	let menu = $state<{ x: number; y: number; row: BudgetRow } | null>(null);
+
+	function menuItems(row: BudgetRow): MenuItem[] {
+		const items: MenuItem[] = [];
+		if (onadd) items.push({ id: 'add', label: 'Add item below', icon: 'addBelow', onselect: () => onadd(row.id) });
+		if (onaddchild) items.push({ id: 'child', label: 'Add child', icon: 'addChild', onselect: () => onaddchild(row.id) });
+		if (ondelete) {
+			items.push({ id: 'delete', label: 'Delete', icon: 'trash', destructive: true, separatorBefore: items.length > 0, onselect: () => ondelete(row.id) });
+		}
+		return items;
+	}
+
+	function oncontextmenu(event: MouseEvent, row: BudgetRow) {
+		if (!hasActions || (event.target as HTMLElement).closest('input, textarea')) return;
+		event.preventDefault();
+		menu = { x: event.clientX, y: event.clientY, row };
+	}
 </script>
 
 <!--
@@ -166,7 +191,7 @@
 			<col style="width: 6.5rem" />
 			<col style="width: 8rem" />
 			<col style="width: 8rem" />
-			{#if hasActions}<col style="width: 19rem" />{/if}
+			{#if hasActions}<col style="width: 7.5rem" />{/if}
 		</colgroup>
 		<thead>
 			<tr>
@@ -184,7 +209,7 @@
 		<tbody>
 			{#each rows as row (row.id)}
 				{@const group = row.kind === 'group'}
-				<tr data-kind={row.kind} data-code={row.code} data-item-id={row.id}>
+				<tr data-kind={row.kind} data-code={row.code} data-item-id={row.id} oncontextmenu={(event) => oncontextmenu(event, row)}>
 					<TableCell readonly {...cell(row, 'code')}><span class="code">{row.code}</span></TableCell>
 					<TableCell depth={row.depth} strong={group} {...cell(row, 'description')}>
 						<div class="description">
@@ -237,13 +262,13 @@
 						<TableCell>
 							<div class="actions">
 								{#if onadd}
-									<Button compact aria-label="Add item below {row.code}" onclick={() => onadd(row.id)}>Add below</Button>
+									<IconButton icon="addBelow" label="Add item below {row.code}" onclick={() => onadd(row.id)} />
 								{/if}
 								{#if onaddchild}
-									<Button compact aria-label="Add child to {row.code}" onclick={() => onaddchild(row.id)}>Add child</Button>
+									<IconButton icon="addChild" label="Add child to {row.code}" onclick={() => onaddchild(row.id)} />
 								{/if}
 								{#if ondelete}
-									<Button compact aria-label="Delete {row.code}" onclick={() => ondelete(row.id)}>Delete</Button>
+									<IconButton icon="trash" label="Delete {row.code}" destructive onclick={() => ondelete(row.id)} />
 								{/if}
 							</div>
 						</TableCell>
@@ -251,14 +276,30 @@
 				</tr>
 			{/each}
 		</tbody>
+		<tfoot>
+			{#if onnewitem}
+				<tr class="new-row">
+					<td colspan={columnCount}>
+						<button type="button" class="new-item" data-add-item onclick={onnewitem}>
+							<Icon name="plus" />
+							<span>New item</span>
+						</button>
+					</td>
+				</tr>
+			{/if}
+		</tfoot>
 	</table>
 </div>
+
+{#if menu}
+	<Menu items={menuItems(menu.row)} label="Actions for {menu.row.code}" anchor={{ x: menu.x, y: menu.y }} onclose={() => (menu = null)} />
+{/if}
 
 <style>
 	.scroll {
 		overflow-x: auto;
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-lg);
 		background: var(--color-surface);
 	}
 
@@ -333,9 +374,55 @@
 		}
 	}
 
+	/* Row actions appear on hover or keyboard focus; on touch screens (no hover) they stay visible. */
 	.actions {
 		display: flex;
+		justify-content: flex-end;
+		gap: var(--space-1);
+		opacity: 0;
+		transition: opacity var(--duration-fast);
+	}
+
+	tr:hover .actions,
+	tr:focus-within .actions,
+	.actions:focus-within {
+		opacity: 1;
+	}
+
+	@media (hover: none) {
+		.actions {
+			opacity: 1;
+		}
+	}
+
+	.new-item {
+		display: flex;
+		align-items: center;
 		gap: var(--space-2);
+		width: 100%;
+		min-height: var(--control-height);
+		padding: 0 var(--space-3);
+		border: none;
+		background: transparent;
+		color: var(--color-text-secondary);
+		font: inherit;
+		font-size: var(--font-size-callout);
+		text-align: start;
+		cursor: pointer;
+	}
+
+	.new-item:hover {
+		background: var(--color-selected);
+		color: var(--color-accent);
+	}
+
+	.new-item:focus-visible {
+		outline: var(--focus-ring-width) solid var(--color-focus-ring);
+		outline-offset: calc(var(--focus-ring-width) * -1);
+	}
+
+	.new-row td {
+		padding: 0;
 	}
 
 	.code {
@@ -343,7 +430,4 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	tbody tr:last-child :global(.cell) {
-		border-bottom: none;
-	}
 </style>

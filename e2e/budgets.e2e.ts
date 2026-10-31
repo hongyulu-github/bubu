@@ -139,6 +139,12 @@ describe('Budgets list and editor routes (built static site)', () => {
 	});
 });
 
+/** Run a Budget action from its "⋯" menu on the list page. */
+async function chooseBudgetAction(page: Page, action: 'Rename' | 'Duplicate' | 'Delete', budget: string) {
+	await page.getByRole('button', { name: `Actions for ${budget}` }).click();
+	await page.getByRole('menuitem', { name: action }).click();
+}
+
 describe('Creating a Budget (built static site)', () => {
 	it('creates an empty Budget from the list and opens its editor', async () => {
 		await page.goto(`${baseUrl}/budgets`);
@@ -153,8 +159,8 @@ describe('Creating a Budget (built static site)', () => {
 		await page.getByRole('heading', { name: 'Summer trip' }).waitFor();
 		expect(page.url()).toMatch(new RegExp(`^${baseUrl}/budgets/[0-9a-f-]{36}$`));
 		expect(await page.locator('main').innerText()).toContain('DKK');
-		await page.getByText('This Budget has no Items yet.').waitFor();
-		expect(await page.locator('table[aria-label="Budget Items"]').count()).toBe(0);
+		await page.getByRole('button', { name: 'New item', exact: true }).waitFor();
+		expect(await page.locator('tbody tr').count()).toBe(0);
 
 		// The new Budget is in shared state, so the list shows it next to the saved ones.
 		await page.getByRole('link', { name: /All Budgets/ }).click();
@@ -228,9 +234,9 @@ describe('Building a Budget from nothing (built static site)', () => {
 		await page.getByLabel('Name').fill('From scratch');
 		await page.getByLabel('Currency').selectOption('EUR');
 		await page.getByRole('button', { name: 'Create Budget' }).click();
-		await page.getByText('This Budget has no Items yet.').waitFor();
+		await page.getByRole('button', { name: 'New item', exact: true }).waitFor();
 
-		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByRole('button', { name: 'New item', exact: true }).click();
 		await page.getByLabel('Description 1', { exact: true }).fill('Venue');
 		await page.keyboard.press('Enter');
 		await page.getByLabel('Unit price 1', { exact: true }).fill('1500');
@@ -260,34 +266,48 @@ describe('Building a Budget from nothing (built static site)', () => {
 });
 
 describe('Renaming a Budget (built static site)', () => {
-	it('renames from the editor, keeps the Items, and shows the new name in the list', async () => {
+	it('renames in place from the editor title, keeps the Items, and shows the new name in the list', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
 		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
 
-		await page.getByRole('button', { name: 'Rename' }).click();
-		await page.getByLabel('Name', { exact: true }).fill('');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('heading', { name: 'Wedding' }).dblclick();
+		await page.getByLabel('Budget name').fill('');
+		await page.keyboard.press('Enter');
 		await page.getByText('Enter a name for the Budget.').waitFor();
 
-		await page.getByLabel('Name', { exact: true }).fill('Garden wedding');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByLabel('Budget name').fill('Garden wedding');
+		await page.keyboard.press('Enter');
 		await page.getByRole('heading', { name: 'Garden wedding' }).waitFor();
 		expect(await items()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
 
 		await page.getByRole('link', { name: /All Budgets/ }).click();
 		await page.getByRole('link', { name: /Garden wedding/ }).waitFor();
-		expect(await page.getByRole('link', { name: /Wedding$/ }).count()).toBe(0);
+		expect(await page.getByRole('link', { name: /Wedding/ }).count()).toBe(0);
 		expect(await page.getByRole('link', { name: /Renovation/ }).count()).toBe(1);
 	});
 
-	it('leaves the name alone when cancelled', async () => {
+	it('leaves the name alone when cancelled with Escape', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
 		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
-		await page.getByRole('button', { name: 'Rename' }).click();
-		await page.getByLabel('Name', { exact: true }).fill('Nope');
-		await page.getByRole('button', { name: 'Cancel' }).click();
+		await page.getByRole('button', { name: 'Rename Budget' }).click();
+		await page.getByLabel('Budget name').fill('Nope');
+		await page.keyboard.press('Escape');
 		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
 		expect(await page.getByRole('heading', { name: 'Nope' }).count()).toBe(0);
+	});
+
+	it('renames from the list through the "⋯" menu and the right-click menu', async () => {
+		await page.goto(`${baseUrl}/budgets`);
+		await chooseBudgetAction(page, 'Rename', 'Wedding');
+		await page.getByRole('dialog', { name: 'Rename Budget' }).waitFor();
+		await page.getByRole('textbox', { name: 'Name' }).fill('Menu wedding');
+		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('link', { name: /Menu wedding/ }).waitFor();
+
+		await page.getByRole('link', { name: /Renovation/ }).click({ button: 'right' });
+		await page.getByRole('menu', { name: 'Actions for Renovation' }).waitFor();
+		await page.getByRole('menuitem', { name: 'Delete' }).click();
+		await page.getByRole('dialog', { name: 'Delete “Renovation”?' }).waitFor();
 	});
 });
 
@@ -327,7 +347,7 @@ describe('Deleting Items (built static site)', () => {
 describe('Duplicating a Budget (built static site)', () => {
 	it('copies a Budget, opens the copy with the same Items, and keeps the original untouched when the copy changes', async () => {
 		await page.goto(`${baseUrl}/budgets`);
-		await page.getByRole('button', { name: 'Duplicate Wedding' }).click();
+		await chooseBudgetAction(page, 'Duplicate', 'Wedding');
 		await page.getByRole('link', { name: /Wedding \(copy\)/ }).waitFor();
 		expect(await page.locator('main ul li').count()).toBe(3);
 
@@ -339,7 +359,7 @@ describe('Duplicating a Budget (built static site)', () => {
 		// Change the copy.
 		await page.getByLabel('Description 2', { exact: true }).fill('Changed in the copy');
 		await page.keyboard.press('Enter');
-		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByRole('button', { name: 'New item', exact: true }).click();
 		expect((await items()).length).toBe(4);
 
 		// The original is untouched, and has no history of the copy's edits.
@@ -398,13 +418,13 @@ describe('Deleting a Budget (built static site)', () => {
 		await page.goto(`${baseUrl}/budgets`);
 		await page.getByRole('link', { name: /Wedding/ }).waitFor();
 
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await chooseBudgetAction(page, 'Delete', 'Wedding');
 		await page.getByRole('dialog', { name: 'Delete “Wedding”?' }).waitFor();
 		expect(await page.getByRole('dialog').innerText()).toContain('3 items');
 		await page.getByRole('button', { name: 'Cancel' }).click();
 		expect(await page.locator('main ul li').count()).toBe(2); // cancel changed nothing
 
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await chooseBudgetAction(page, 'Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
 		await expect.poll(() => page.locator('main ul li').count()).toBe(1);
 		expect(await page.getByRole('link', { name: /Renovation/ }).count()).toBe(1);
@@ -426,9 +446,9 @@ describe('Everything is saved automatically (built static site)', () => {
 		await page.getByLabel('Name').fill('Saved from scratch');
 		await page.getByLabel('Currency').selectOption('DKK');
 		await page.getByRole('button', { name: 'Create Budget' }).click();
-		await page.getByText('This Budget has no Items yet.').waitFor();
+		await page.getByRole('button', { name: 'New item', exact: true }).waitFor();
 
-		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		await page.getByRole('button', { name: 'New item', exact: true }).click();
 		await page.getByLabel('Description 1', { exact: true }).fill('Venue');
 		await page.keyboard.press('Enter');
 		await page.getByLabel('Unit price 1', { exact: true }).fill('-250.50');
@@ -455,14 +475,14 @@ describe('Everything is saved automatically (built static site)', () => {
 	it('keeps a rename, a duplicate and an edit to a seeded Budget after a reload', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
 		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
-		await page.getByRole('button', { name: 'Rename' }).click();
-		await page.getByLabel('Name', { exact: true }).fill('Renamed');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Rename Budget' }).click();
+		await page.getByLabel('Budget name').fill('Renamed');
+		await page.keyboard.press('Enter');
 		await page.getByLabel('Description 2', { exact: true }).fill('Changed');
 		await page.keyboard.press('Enter');
 
 		await page.getByRole('link', { name: /All Budgets/ }).click();
-		await page.getByRole('button', { name: 'Duplicate Renamed' }).click();
+		await chooseBudgetAction(page, 'Duplicate', 'Renamed');
 		await page.getByRole('link', { name: /Renamed \(copy\)/ }).waitFor();
 
 		await page.reload();
@@ -475,7 +495,7 @@ describe('Everything is saved automatically (built static site)', () => {
 
 	it('does not bring a deleted Budget back after a reload', async () => {
 		await page.goto(`${baseUrl}/budgets`);
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await chooseBudgetAction(page, 'Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
 		await expect.poll(() => page.locator('main ul li').count()).toBe(1);
 

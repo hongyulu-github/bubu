@@ -50,6 +50,12 @@ const newStore = (hydrate = true) => {
 beforeEach(() => localStorage.clear());
 afterEach(() => localStorage.clear());
 
+/** Run a Budget action from its "⋯" menu, the way a user does. */
+async function choose(action: 'Rename' | 'Duplicate' | 'Delete', budget: string) {
+	await page.getByRole('button', { name: `Actions for ${budget}` }).click();
+	await page.getByRole('menuitem', { name: action }).click();
+}
+
 describe('BudgetsList', () => {
 	it('shows every saved Budget with its name and currency, most recently changed first', async () => {
 		seed();
@@ -81,7 +87,7 @@ describe('BudgetsList', () => {
 		render(BudgetsList, { store });
 		await expect.element(page.getByRole('link', { name: /Wedding/ })).toBeVisible();
 
-		await page.getByRole('button', { name: 'Duplicate Wedding' }).click();
+		await choose('Duplicate', 'Wedding');
 
 		await expect.element(page.getByRole('link', { name: /Wedding \(copy\)/ })).toBeVisible();
 		expect(document.querySelectorAll('main ul li')).toHaveLength(3);
@@ -97,7 +103,7 @@ describe('BudgetsList', () => {
 		seed();
 		const store = newStore();
 		render(BudgetsList, { store });
-		await page.getByRole('button', { name: 'Duplicate Wedding' }).click();
+		await choose('Duplicate', 'Wedding');
 
 		const copy = store.budgets.find((b) => b.name === 'Wedding (copy)')!;
 		const originalBefore = store.itemsOf(A);
@@ -108,11 +114,26 @@ describe('BudgetsList', () => {
 		expect(store.canUndo(copy.id)).toBe(true);
 	});
 
-	it('offers Duplicate for every Budget, each named for its Budget', async () => {
+	it('offers a "⋯" menu per Budget with Rename, Duplicate and Delete, named for the Budget', async () => {
 		seed();
 		render(BudgetsList, { store: newStore() });
-		await expect.element(page.getByRole('button', { name: 'Duplicate Wedding' })).toBeVisible();
-		await expect.element(page.getByRole('button', { name: 'Duplicate Renovation' })).toBeVisible();
+		await page.getByRole('button', { name: 'Actions for Wedding' }).click();
+		const menu = page.getByRole('menu', { name: 'Actions for Wedding' });
+		await expect.element(menu).toBeVisible();
+		await expect.element(menu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
+		await expect.element(menu.getByRole('menuitem', { name: 'Duplicate' })).toBeVisible();
+		await expect.element(menu.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+	});
+
+	it('offers the same actions on right-click, and no visible text buttons per Budget', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		expect(page.getByRole('button', { name: 'Duplicate Wedding' }).elements()).toHaveLength(0);
+		await page.getByRole('link', { name: /Wedding/ }).click({ button: 'right' });
+		const menu = page.getByRole('menu', { name: 'Actions for Wedding' });
+		await expect.element(menu.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(menu).not.toBeInTheDocument();
 	});
 
 	it('duplicates an empty Budget as an empty Budget', async () => {
@@ -121,7 +142,7 @@ describe('BudgetsList', () => {
 		const blank = store.createBudget({ name: 'Blank', currency: 'USD' });
 		if (!blank.ok) throw new Error('creation failed');
 		render(BudgetsList, { store });
-		await page.getByRole('button', { name: 'Duplicate Blank' }).click();
+		await choose('Duplicate', 'Blank');
 		const copy = store.budgets.find((b) => b.name === 'Blank (copy)')!;
 		expect(store.itemsOf(copy.id)).toEqual([]);
 	});
@@ -129,7 +150,7 @@ describe('BudgetsList', () => {
 	it('asks before deleting a Budget, naming it and what goes with it', async () => {
 		seed();
 		render(BudgetsList, { store: newStore() });
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await choose('Delete', 'Wedding');
 
 		const dialog = page.getByRole('dialog', { name: 'Delete “Wedding”?' });
 		await expect.element(dialog).toBeVisible();
@@ -146,13 +167,13 @@ describe('BudgetsList', () => {
 		store.setItems(B, [store.itemsOf(B)[0]]);
 		render(BudgetsList, { store });
 
-		await page.getByRole('button', { name: 'Delete Blank' }).click();
+		await choose('Delete', 'Blank');
 		await expect.element(page.getByRole('dialog', { name: 'Delete “Blank”?' })).toHaveAccessibleDescription(
 			'This permanently deletes the Budget. It has no items. It cannot be undone.'
 		);
 		await page.getByRole('button', { name: 'Cancel' }).click();
 
-		await page.getByRole('button', { name: 'Delete Renovation' }).click();
+		await choose('Delete', 'Renovation');
 		await expect.element(page.getByRole('dialog', { name: 'Delete “Renovation”?' })).toHaveAccessibleDescription(
 			'This permanently deletes the Budget. Its 1 item is deleted with it. It cannot be undone.'
 		);
@@ -165,14 +186,14 @@ describe('BudgetsList', () => {
 		const budgets = store.budgets;
 		const items = store.itemsOf(A);
 
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await choose('Delete', 'Wedding');
 		await page.getByRole('button', { name: 'Cancel' }).click();
 		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
 		expect(store.budgets).toBe(budgets);
 		expect(store.itemsOf(A)).toBe(items);
 		expect(document.querySelectorAll('main ul li')).toHaveLength(2);
 
-		await page.getByRole('button', { name: 'Delete Renovation' }).click();
+		await choose('Delete', 'Renovation');
 		await userEvent.keyboard('{Escape}');
 		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
 		expect(store.budgets).toBe(budgets);
@@ -189,7 +210,7 @@ describe('BudgetsList', () => {
 		expect(store.canUndo(A)).toBe(true);
 		expect(store.canUndo(B)).toBe(true);
 
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await choose('Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
 
 		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
@@ -207,7 +228,7 @@ describe('BudgetsList', () => {
 	it('puts focus on a stable control after deleting', async () => {
 		seed();
 		render(BudgetsList, { store: newStore() });
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await choose('Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
 		await expect.element(page.getByRole('link', { name: 'New Budget' })).toHaveFocus();
 	});
@@ -216,8 +237,8 @@ describe('BudgetsList', () => {
 		seed();
 		const store = newStore();
 		render(BudgetsList, { store });
-		for (const name of ['Delete Wedding', 'Delete Renovation']) {
-			await page.getByRole('button', { name }).click();
+		for (const name of ['Wedding', 'Renovation']) {
+			await choose('Delete', name);
 			await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
 		}
 		await expect.element(page.getByText('No saved Budgets yet.')).toBeVisible();
@@ -228,16 +249,16 @@ describe('BudgetsList', () => {
 		seed();
 		render(BudgetsList, { store: newStore() });
 		const before = JSON.stringify({ ...localStorage });
-		await page.getByRole('button', { name: 'Delete Wedding' }).click();
+		await choose('Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
 		expect(JSON.stringify({ ...localStorage })).toBe(before);
 	});
 
-	it('offers Delete for every Budget, each named for its Budget', async () => {
+	it('gives every Budget its own "⋯" menu button, named for the Budget', async () => {
 		seed();
 		render(BudgetsList, { store: newStore() });
-		await expect.element(page.getByRole('button', { name: 'Delete Wedding' })).toBeVisible();
-		await expect.element(page.getByRole('button', { name: 'Delete Renovation' })).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Actions for Wedding' })).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Actions for Renovation' })).toBeVisible();
 	});
 
 	it('shows a loading state before hydration and an empty state with no Budgets', async () => {

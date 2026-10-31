@@ -6,11 +6,11 @@
 	import { formatMoney } from '../budget/currency';
 	import { parseHistoryShortcut } from '../budget/shortcuts';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
-	import Button from '../components/Button.svelte';
+	import IconButton from '../components/IconButton.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
 	import ConfirmConversionDialog from './ConfirmConversionDialog.svelte';
 	import ConfirmDeleteDialog from './ConfirmDeleteDialog.svelte';
-	import RenameBudgetDialog from './RenameBudgetDialog.svelte';
+	import InlineTitle from './InlineTitle.svelte';
 
 	let { budgetId, store = budgetStore }: { budgetId: string; store?: BudgetStore } = $props();
 
@@ -49,7 +49,13 @@
 		else store.redo(budgetId);
 	}
 
-	let renaming = $state(false);
+	// Shortcut hints in tooltips follow the platform: ⌘ on Apple devices, Ctrl elsewhere.
+	let apple = $state(false);
+	$effect(() => {
+		apple = /Mac|iPhone|iPad/.test(navigator.platform);
+	});
+	const mod = $derived(apple ? '⌘' : 'Ctrl+');
+	const shift = $derived(apple ? '⇧' : 'Shift+');
 	let confirmingConversion = $state(false);
 	let pendingConversion = $state<ConversionImpact | null>(null);
 	let confirmingDelete = $state(false);
@@ -143,10 +149,7 @@
 	{:else if budget}
 		<header>
 			<div>
-				<div class="title">
-					<h1>{budget.name}</h1>
-					<Button compact onclick={() => (renaming = true)}>Rename</Button>
-				</div>
+				<InlineTitle {budgetId} {store} />
 				<p class="meta">{budget.currency}</p>
 			</div>
 			{#if ready}
@@ -157,32 +160,37 @@
 			{/if}
 		</header>
 
-		<RenameBudgetDialog {budgetId} bind:open={renaming} {store} />
 		<ConfirmConversionDialog impact={pendingConversion} bind:open={confirmingConversion} onconfirm={confirmConversion} />
 		<ConfirmDeleteDialog impact={pendingDelete} bind:open={confirmingDelete} onconfirm={confirmDelete} />
 
 		{#if ready}
 			<div class="toolbar">
-				<div class="history" role="group" aria-label="History">
-					<Button aria-keyshortcuts="Control+Z Meta+Z" disabled={!store.canUndo(budgetId)} onclick={() => store.undo(budgetId)}>Undo</Button>
-					<Button
+				<div class="group" role="group" aria-label="History">
+					<IconButton
+						icon="undo"
+						label="Undo"
+						shortcut="{mod}Z"
+						aria-keyshortcuts="Control+Z Meta+Z"
+						disabled={!store.canUndo(budgetId)}
+						onclick={() => store.undo(budgetId)}
+					/>
+					<IconButton
+						icon="redo"
+						label="Redo"
+						shortcut="{shift}{mod}Z"
 						aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
 						disabled={!store.canRedo(budgetId)}
-						onclick={() => store.redo(budgetId)}>Redo</Button
-					>
+						onclick={() => store.redo(budgetId)}
+					/>
 				</div>
 				{#if groupIds.length > 0}
-					<div class="history" role="group" aria-label="Groups">
-						<Button disabled={allCollapsed} onclick={() => (collapsed = collapseAll(rows))}>Collapse all</Button>
-						<Button disabled={noneCollapsed} onclick={() => (collapsed = expandAll())}>Expand all</Button>
+					<div class="group" role="group" aria-label="Groups">
+						<IconButton icon="collapseAll" label="Collapse all" disabled={allCollapsed} onclick={() => (collapsed = collapseAll(rows))} />
+						<IconButton icon="expandAll" label="Expand all" disabled={noneCollapsed} onclick={() => (collapsed = expandAll())} />
 					</div>
 				{/if}
 			</div>
-		{/if}
 
-		{#if ready && rows.length === 0}
-			<p class="note">This Budget has no Items yet.</p>
-		{:else if rows.length > 0}
 			<BudgetSpreadsheet
 				rows={shownRows}
 				currency={budget.currency}
@@ -192,13 +200,8 @@
 				onadd={addBelow}
 				ondelete={requestDelete}
 				onaddchild={requestAddChild}
+				onnewitem={addTopLevel}
 			/>
-		{/if}
-
-		{#if ready}
-			<div class="add">
-				<Button variant="primary" data-add-item onclick={addTopLevel}>Add item</Button>
-			</div>
 		{/if}
 	{:else if loadFailure}
 		<h1>This Budget could not be loaded</h1>
@@ -211,9 +214,8 @@
 
 <style>
 	main {
-		max-width: 72rem;
-		margin: 0 auto;
-		padding: var(--space-6) var(--space-4);
+		/* The table uses the whole window; only the page padding frames it. */
+		padding: var(--space-5);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
@@ -226,6 +228,7 @@
 	h1 {
 		margin: 0;
 		font-size: var(--font-size-display);
+		font-weight: var(--font-weight-bold);
 		line-height: var(--line-height-tight);
 	}
 
@@ -250,30 +253,22 @@
 		align-items: flex-end;
 		justify-content: space-between;
 		gap: var(--space-4);
-		margin-bottom: var(--space-3);
-	}
-
-	.title {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: var(--space-3);
-	}
-
-	.add {
-		display: flex;
-		margin-top: var(--space-2);
 	}
 
 	.toolbar {
 		display: flex;
 		flex-wrap: wrap;
-		gap: var(--space-4);
+		align-items: center;
+		gap: var(--space-2);
 	}
 
-	.history {
+	.group {
 		display: flex;
-		gap: var(--space-2);
+		gap: var(--space-1);
+		padding: 2px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
 	}
 
 	.total {
@@ -289,7 +284,7 @@
 
 	output {
 		font-size: var(--font-size-title);
-		font-weight: var(--font-weight-semibold);
+		font-weight: var(--font-weight-bold);
 		font-variant-numeric: tabular-nums;
 	}
 </style>

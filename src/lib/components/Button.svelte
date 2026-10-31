@@ -21,8 +21,9 @@
 		const button = host.querySelector('button');
 		if (!button) return;
 		for (const [name, value] of Object.entries(rest)) {
-			if (value === undefined || value === null || value === false) button.removeAttribute(name);
-			else button.setAttribute(name, value === true ? '' : String(value));
+			if (value === undefined || value === null) button.removeAttribute(name);
+			else if (value === false && !name.startsWith('aria-')) button.removeAttribute(name);
+			else button.setAttribute(name, value === true && !name.startsWith('aria-') ? '' : String(value));
 		}
 	}
 </script>

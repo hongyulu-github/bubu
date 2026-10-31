@@ -49,3 +49,10 @@
 	--color-error: var(--color-error);
 	--color-info: var(--color-info);
 }
+
+/* Apply the app's radius scale to stdf's own components (its Cherry theme is pill-shaped by default). */
+[data-theme='Cherry'] {
+	--radius-box: var(--radius-lg);
+	--radius-form: var(--radius-md);
+	--radius-small: var(--radius-sm);
+}
