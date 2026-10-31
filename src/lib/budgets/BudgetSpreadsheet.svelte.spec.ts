@@ -73,11 +73,11 @@ describe('BudgetSpreadsheet', () => {
 		render(BudgetSpreadsheet, { rows: openStore(nested()).rows, currency: 'EUR' });
 		await expect.element(page.getByRole('grid', { name: 'Budget Items' })).toBeVisible();
 		expect(table()).toEqual([
-			['1', 'Item 1', '2', '', '€67.00', '€134.00'],
-			['1.1', 'Item 2', '3', '', '€20.00', '€60.00'],
-			['1.1.1', 'Item 3', '1', '', '€10.00', '€10.00'],
-			['1.1.2', 'Item 4', '2', '', '€5.00', '€10.00'],
-			['1.2', 'Item 5', '1', '', '€7.00', '€7.00']
+			['1', 'Item 1', '2', '', '67.00', '134.00'],
+			['1.1', 'Item 2', '3', '', '20.00', '60.00'],
+			['1.1.1', 'Item 3', '1', '', '10.00', '10.00'],
+			['1.1.2', 'Item 4', '2', '', '5.00', '10.00'],
+			['1.2', 'Item 5', '1', '', '7.00', '7.00']
 		]);
 	});
 
@@ -85,10 +85,10 @@ describe('BudgetSpreadsheet', () => {
 		const items = [item(1, null, '0', '2'), item(2, 1, '100'), item(3, 1, '-250'), item(4, null, '40')];
 		render(BudgetSpreadsheet, { rows: openStore(items).rows, currency: 'EUR' });
 		expect(table()).toEqual([
-			['1', 'Item 1', '2', '', '-€150.00', '-€300.00'],
-			['1.1', 'Item 2', '1', '', '€100.00', '€100.00'],
-			['1.2', 'Item 3', '1', '', '-€250.00', '-€250.00'],
-			['2', 'Item 4', '1', '', '€40.00', '€40.00']
+			['1', 'Item 1', '2', '', '-150.00', '-300.00'],
+			['1.1', 'Item 2', '1', '', '100.00', '100.00'],
+			['1.2', 'Item 3', '1', '', '-250.00', '-250.00'],
+			['2', 'Item 4', '1', '', '40.00', '40.00']
 		]);
 	});
 
@@ -97,7 +97,7 @@ describe('BudgetSpreadsheet', () => {
 		const store = openStore(items);
 		render(BudgetSpreadsheet, { rows: store.rows, currency: 'EUR' });
 		// 0.5 x 19.99 is exactly 9.995, which shows as 10.00 in euros...
-		expect(table().map((row) => row.slice(2).join('|'))).toEqual(['0.5||€19.99|€10.00', '1||€0.10|€0.10', '1||€0.20|€0.20']);
+		expect(table().map((row) => row.slice(2).join('|'))).toEqual(['0.5||19.99|10.00', '1||0.10|0.10', '1||0.20|0.20']);
 		// ...while the calculation behind it is untouched.
 		expect(decimalToString(store.rows[0].amounts.total)).toBe('9.995');
 		expect(store.itemsOf(BUDGET)[0].unitPrice).toBe('19.99');
@@ -125,7 +125,7 @@ describe('BudgetSpreadsheet', () => {
 		const rows = table();
 		expect(rows).toHaveLength(depth + 1);
 		expect(rows.at(-1)![0].split('.')).toHaveLength(depth + 1);
-		expect(rows.at(-1)![5]).toBe('€3.00');
+		expect(rows.at(-1)![5]).toBe('3.00');
 
 		const indent = (index: number) =>
 			parseFloat(getComputedStyle(document.querySelectorAll('tbody tr')[index].querySelectorAll('td')[1]).paddingInlineStart);
@@ -211,7 +211,7 @@ describe('Budget root and grand total', () => {
 		// Inner Group quantity 3 -> 4: inner 80, outer (80 + 7) x 2 = 174.
 		store.execute(BUDGET, store.itemsOf(BUDGET).map((i) => (i.id === uuid(2) ? { ...i, quantity: '4' } : i)));
 		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('€174.00');
-		expect(table()[1]).toEqual(['1.1', 'Item 2', '4', '', '€20.00', '€80.00']);
+		expect(table()[1]).toEqual(['1.1', 'Item 2', '4', '', '20.00', '80.00']);
 
 		store.undo(BUDGET);
 		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('€134.00');
@@ -261,7 +261,7 @@ describe('inline editing', () => {
 
 		await expect.element(total()).toHaveTextContent('€174.00');
 		expect(itemOf(store, 2).quantity).toBe('4');
-		expect(table()[1]).toEqual(['1.1', 'Item 2', '4', '', '€20.00', '€80.00']);
+		expect(table()[1]).toEqual(['1.1', 'Item 2', '4', '', '20.00', '80.00']);
 		store.undo(BUDGET);
 		expect(store.canUndo(BUDGET)).toBe(false);
 	});
@@ -287,7 +287,7 @@ describe('inline editing', () => {
 		expect(itemOf(store, 5).unitPrice).toBe('-250.25');
 		// inner: 10 + 5 x 0.5 = 12.5 -> x3 = 37.5; outer: (37.5 + -250.25) x 2 = -425.5
 		await expect.element(total()).toHaveTextContent('-€425.50');
-		expect(table()[4]).toEqual(['1.2', 'Item 5', '1', '', '-250.25', '-€250.25']); // the Line price is an input: exact, unformatted
+		expect(table()[4]).toEqual(['1.2', 'Item 5', '1', '', '-250.25', '-250.25']); // the Line price is an input: exact, unformatted
 	});
 
 	it('shows validation for blank, non-numeric and negative-Quantity commits without changing data or history', async () => {
@@ -387,7 +387,7 @@ describe('adding Items', () => {
 
 		await expect.element(page.getByRole('grid', { name: 'Budget Items' })).toBeVisible();
 		expect(codes()).toEqual(['1']);
-		expect(table()).toEqual([['1', '', '1', '', '0', '€0.00']]); // empty Description, Quantity 1, Unit price 0 (an input), Total 0
+		expect(table()).toEqual([['1', '', '1', '', '0', '0.00']]); // empty Description, Quantity 1, Unit price 0 (an input), Total 0
 		await expect.element(page.getByLabelText('Description 1', { exact: true })).toHaveFocus();
 		await expect.element(grandTotal()).toHaveTextContent('€0.00');
 	});
@@ -407,7 +407,7 @@ describe('adding Items', () => {
 		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.1.3', '1.2']);
 		const kinds = [...document.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-kind'));
 		expect(kinds).toEqual(['group', 'group', 'line', 'line', 'line', 'line']);
-		expect(table()[3]).toEqual(['1.1.2', '', '1', '', '0', '€0.00']); // the new Item
+		expect(table()[3]).toEqual(['1.1.2', '', '1', '', '0', '0.00']); // the new Item
 		expect(table()[4][1]).toBe('Item 4'); // the old 1.1.2 moved down to 1.1.3
 		await expect.element(grandTotal()).toHaveTextContent('€134.00');
 		await expect.element(page.getByLabelText('Description 1.1.2', { exact: true })).toHaveFocus();
@@ -445,7 +445,7 @@ describe('adding Items', () => {
 		await page.getByRole('button', { name: 'Add item below 1.2' }).click();
 		const after = table();
 		expect(after.filter((row) => row[0] !== '1.3')).toEqual(before);
-		expect(after.at(-1)).toEqual(['1.3', '', '1', '', '0', '€0.00']);
+		expect(after.at(-1)).toEqual(['1.3', '', '1', '', '0', '0.00']);
 	});
 
 	it('shows a row action only for editable tables, with an accessible name per row', async () => {
@@ -663,7 +663,7 @@ describe('adding children', () => {
 		expect(document.querySelector('[aria-label="Unit price 1"]')).toBeNull(); // now calculated
 		await expect.element(page.getByLabelText('Quantity 1', { exact: true })).toHaveValue('3'); // not reset to 1
 		await expect.element(page.getByLabelText('Description 1.1', { exact: true })).toHaveFocus();
-		expect(table()[1]).toEqual(['1.1', '', '1', '', '0', '€0.00']); // child defaults
+		expect(table()[1]).toEqual(['1.1', '', '1', '', '0', '0.00']); // child defaults
 		await expect.element(grandTotal()).toHaveTextContent('€7.00'); // the group is now priced from its (empty) child
 		expect(store.itemsOf(BUDGET).find((i) => i.id === uuid(1))!.unitPrice).toBe('0');
 	});
@@ -731,12 +731,12 @@ describe('money display in the Budget currency', () => {
 	it('shows Line prices, Group prices, Totals and the grand total in the Budget currency', async () => {
 		const store = openStore(priced(), 'USD');
 		render(BudgetSpreadsheet, { rows: store.rows, currency: 'USD' });
-		expect(priceCell('1')).toBe('$1,200.25'); // Group unit price (calculated)
-		expect(totalCell('1')).toBe('$2,400.50'); // Group total
-		expect(priceCell('1.1')).toBe('$1,234.50'); // Line unit price (read-only table)
-		expect(totalCell('1.1')).toBe('$1,234.50');
-		expect(priceCell('1.2')).toBe('-$34.25'); // negative Line price
-		expect(totalCell('1.2')).toBe('-$34.25');
+		expect(priceCell('1')).toBe('1200.25'); // Group unit price (calculated)
+		expect(totalCell('1')).toBe('2400.50'); // Group total
+		expect(priceCell('1.1')).toBe('1234.50'); // Line unit price (read-only table)
+		expect(totalCell('1.1')).toBe('1234.50');
+		expect(priceCell('1.2')).toBe('-34.25'); // negative Line price
+		expect(totalCell('1.2')).toBe('-34.25');
 	});
 
 	it('shows the grand total in the Budget currency, including when it is zero or negative', async () => {
@@ -747,8 +747,8 @@ describe('money display in the Budget currency', () => {
 	it('uses the currency decimal places: none for yen, three for dinars', async () => {
 		const yen = openStore([item(1, null, '1234.5', '3')], 'JPY');
 		render(BudgetSpreadsheet, { rows: yen.rows, currency: 'JPY' });
-		expect(priceCell('1')).toBe('¥1,235'); // 1234.5 rounded for display only
-		expect(totalCell('1')).toBe('¥3,704'); // 3 x 1234.5 = 3703.5, shown rounded; not 3 x 1235
+		expect(priceCell('1')).toBe('1235'); // 1234.5 rounded for display only
+		expect(totalCell('1')).toBe('3704'); // 3 x 1234.5 = 3703.5, shown rounded; not 3 x 1235
 		expect(decimalToString(yen.rows[0].amounts.total)).toBe('3703.5'); // the calculation keeps the exact value
 	});
 
@@ -756,30 +756,29 @@ describe('money display in the Budget currency', () => {
 		const store = openStore([item(1, null, '12.3456', '2')], 'KWD');
 		render(BudgetEditorPage, { budgetId: BUDGET, store });
 		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('KWD 24.691'); // 24.6912
-		expect(totalCell('1')?.replace(/\s/g, ' ')).toBe('KWD 24.691');
+		expect(totalCell('1')).toBe('24.691'); // plain number: no code, no symbol
 	});
 
 	it('renders zero as a plain zero amount', async () => {
 		const store = openStore([item(1, null, '0'), item(2, null, '0', '0')], 'EUR');
 		render(BudgetSpreadsheet, { rows: store.rows, currency: 'EUR' });
-		expect(totalCell('1')).toBe('€0.00');
-		expect(totalCell('2')).toBe('€0.00');
+		expect(totalCell('1')).toBe('0.00');
+		expect(totalCell('2')).toBe('0.00');
 	});
 
 	it('does not print a negative zero for a total that rounds to nothing', async () => {
 		const store = openStore([item(1, null, '-0.001')], 'USD');
 		render(BudgetSpreadsheet, { rows: store.rows, currency: 'USD' });
-		expect(totalCell('1')).toBe('$0.00');
+		expect(totalCell('1')).toBe('0.00');
 	});
 
-	it('shows the same amount identically in the Line, the Group above it and the grand total', async () => {
+	it('shows the same amount in the Line, the Group above it and the grand total (plain in the table, formatted in the total)', async () => {
 		const store = openStore([item(1, null, '0'), item(2, 1, '1234.5')], 'EUR');
 		render(BudgetEditorPage, { budgetId: BUDGET, store });
-		const shown = '€1,234.50';
-		expect(totalCell('1.1')).toBe(shown);
-		expect(priceCell('1')).toBe(shown);
-		expect(totalCell('1')).toBe(shown);
-		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent(shown);
+		expect(totalCell('1.1')).toBe('1234.50'); // table cells are plain numbers...
+		expect(priceCell('1')).toBe('1234.50');
+		expect(totalCell('1')).toBe('1234.50');
+		await expect.element(page.getByLabelText('Grand total')).toHaveTextContent('€1,234.50'); // ...the grand total carries the currency
 	});
 
 	it('leaves the exact value in editable inputs, unformatted and unrounded', async () => {
@@ -790,13 +789,13 @@ describe('money display in the Budget currency', () => {
 		await expect.element(page.getByLabelText('Unit price 1', { exact: true })).toHaveValue(precise);
 		await expect.element(page.getByLabelText('Unit price 2', { exact: true })).toHaveValue('-1234.567');
 		await expect.element(page.getByLabelText('Quantity 1', { exact: true })).toHaveValue('2.50');
-		expect(totalCell('2')).toBe('-$1,234.57'); // read-only Total is formatted
+		expect(totalCell('2')).toBe('-1234.57'); // read-only Total: rounded to the currency's decimals, no symbol
 	});
 
 	it('never changes stored values by displaying them: they are the same after rendering and editing elsewhere', async () => {
 		const store = openStore([item(1, null, '19.99', '0.5'), item(2, null, '3')], 'USD');
 		render(BudgetEditorPage, { budgetId: BUDGET, store });
-		expect(totalCell('1')).toBe('$10.00'); // 9.995 shown rounded
+		expect(totalCell('1')).toBe('10.00'); // 9.995 shown rounded
 		await page.getByLabelText('Unit price 2', { exact: true }).fill('4');
 		await userEvent.keyboard('{Enter}');
 
@@ -812,7 +811,7 @@ describe('money display in the Budget currency', () => {
 		const cell = document.querySelectorAll('tr[data-code="1"] td')[4];
 		expect(cell.hasAttribute('data-readonly')).toBe(true);
 		expect(cell.querySelector('input, select, textarea, button')).toBeNull();
-		expect(cell.textContent?.trim()).toBe('$1,200.25');
+		expect(cell.textContent?.trim()).toBe('1200.25');
 	});
 });
 
@@ -904,7 +903,7 @@ describe('collapsing groups', () => {
 
 		await expect.element(grandTotal()).toHaveTextContent('€234.00'); // unchanged
 		expect(table()).toEqual([before[0], before[5]]); // the same Total for Group 1, the same Codes
-		expect(table()[0][5]).toBe('€134.00'); // Group 1's Total still includes its hidden descendants
+		expect(table()[0][5]).toBe('134.00'); // Group 1's Total still includes its hidden descendants
 		expect(shownCodes()).toEqual(['1', '2']); // not renumbered
 	});
 

@@ -52,3 +52,27 @@ export function formatMoney(value: Decimal, currency: string, locale: string = D
 		return `${exact} ${currency}`;
 	}
 }
+
+const plainFormats = new Map<string, Intl.NumberFormat>();
+
+/**
+ * Format an exact amount as a plain number for table cells: no currency symbol and no thousands
+ * separators, rounded to the currency's minor units (display only), e.g. `-1234.50`. It reads like the
+ * plain-decimal inputs next to it; the Budget's currency and the grouped total are shown by `formatMoney`.
+ */
+export function formatAmount(value: Decimal, currency: string, locale: string = DISPLAY_LOCALE): string {
+	const digits = currencyFractionDigits(currency, locale);
+	const key = `${locale}|${digits}`;
+	let format = plainFormats.get(key);
+	if (!format) {
+		format = new Intl.NumberFormat(locale, {
+			useGrouping: false,
+			minimumFractionDigits: digits,
+			maximumFractionDigits: digits,
+			roundingMode: 'halfExpand',
+			signDisplay: 'negative'
+		} as Intl.NumberFormatOptions);
+		plainFormats.set(key, format);
+	}
+	return format.format(toString(value) as `${number}`);
+}

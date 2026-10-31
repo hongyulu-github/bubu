@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { add, fromString, multiply, toString } from './numbers';
-import { currencyFractionDigits, formatMoney } from './currency';
+import { currencyFractionDigits, formatAmount, formatMoney } from './currency';
 
 const money = (amount: string, currency: string, locale?: string) => formatMoney(fromString(amount), currency, locale);
 
@@ -134,5 +134,37 @@ describe('formatMoney: unsupported currency codes', () => {
 
 	it('still formats a well-formed code the platform does not know', () => {
 		expect(money('5', 'ZZZ')).toBe('ZZZ\u00a05.00');
+	});
+});
+
+describe('formatAmount: plain numbers for table cells', () => {
+	const show = (value: string, currency = 'EUR') => formatAmount(fromString(value), currency);
+
+	it('has no currency symbol and no thousands separators', () => {
+		expect(show('1234.5')).toBe('1234.50');
+		expect(show('1234567.891')).toBe('1234567.89');
+		expect(show('-1234.5', 'USD')).toBe('-1234.50');
+	});
+
+	it('uses the currency decimal places: none for yen, three for dinars', () => {
+		expect(show('1234.5', 'JPY')).toBe('1235');
+		expect(show('12.3456', 'KWD')).toBe('12.346');
+	});
+
+	it('rounds half away from zero exactly, for display only', () => {
+		expect(show('9.995')).toBe('10.00');
+		expect(show('-9.995')).toBe('-10.00');
+		expect(show('0.1000000000000000055511151231257827')).toBe('0.10');
+	});
+
+	it('never prints a negative zero, and shows zero with the currency decimals', () => {
+		expect(show('-0.001')).toBe('0.00');
+		expect(show('0')).toBe('0.00');
+	});
+
+	it('matches the digits formatMoney shows, so the table and the grand total agree', () => {
+		for (const value of ['0', '19.99', '-250.25', '1234.5', '9.995']) {
+			expect(formatMoney(fromString(value), 'EUR').replace(/[^\d.-]/g, '')).toBe(show(value).replace(/[^\d.-]/g, '').replace(/^(-?)/, '$1'));
+		}
 	});
 });

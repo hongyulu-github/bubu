@@ -10,7 +10,7 @@
 		type Column,
 		type Direction
 	} from '../budget/grid';
-	import { formatMoney } from '../budget/currency';
+	import { formatAmount } from '../budget/currency';
 	import { toString } from '../budget/numbers';
 	import Icon from '../components/Icon.svelte';
 	import IconButton from '../components/IconButton.svelte';
@@ -20,7 +20,7 @@
 
 	interface Props {
 		rows: readonly BudgetRow[];
-		/** The Budget currency: monetary cells are shown in it, rounded to its minor units for display only. */
+		/** The Budget currency: monetary cells use its decimals (no symbol), rounded to its minor units for display only. */
 		currency: string;
 		/**
 		 * Commit an edit. When omitted the table is read-only. Which cells are editable at all is
@@ -244,10 +244,10 @@
 						{#if onedit && !group}
 							{@render editor(row, 'unitPrice', 'Unit price', row.item.unitPrice)}
 						{:else}
-							{formatMoney(row.amounts.unitPrice, currency)}
+							{formatAmount(row.amounts.unitPrice, currency)}
 						{/if}
 					</TableCell>
-					<TableCell numeric readonly strong {...cell(row, 'total')}>{formatMoney(row.amounts.total, currency)}</TableCell>
+					<TableCell numeric readonly strong {...cell(row, 'total')}>{formatAmount(row.amounts.total, currency)}</TableCell>
 					{#if hasActions}
 						<TableCell>
 							<div class="actions">
