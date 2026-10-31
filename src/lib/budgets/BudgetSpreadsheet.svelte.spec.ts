@@ -6,7 +6,7 @@ import '../styles/base.css';
 import { createBudget, createItem, type Item } from '../budget/model';
 import { toString as decimalToString } from '../budget/numbers';
 import { CommandHistory } from '../history/commands';
-import { contrastRatio, resetTheme, setTheme, type Theme } from '../testing/theme';
+import { contrastRatio, effectiveBackground, resetTheme, setTheme, type Theme } from '../testing/theme';
 import { BudgetStore } from '../state/budgets.svelte';
 import BudgetEditorPage from './BudgetEditorPage.svelte';
 import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
@@ -146,23 +146,29 @@ describe('BudgetSpreadsheet', () => {
 		expect(document.querySelectorAll('table input, table select, table textarea, table button, table [contenteditable]')).toHaveLength(0);
 	});
 
-	it.each<Theme>(['light', 'dark'])('tells read-only cells apart from editable ones and stays readable in %s', async (theme) => {
+	it.each<Theme>(['light', 'dark'])('tells read-only cells apart without a fill, and every cell stays readable in %s', async (theme) => {
 		setTheme(theme);
 		render(BudgetSpreadsheet, { rows: openStore(nested()).rows, currency: 'EUR' });
 		const cell = (rowCode: string, index: number) => document.querySelectorAll(`tr[data-code="${rowCode}"] td`)[index] as HTMLElement;
 
+		// Read-only cells share the table background: on a Line row nothing is filled at all.
 		const transparent = 'rgba(0, 0, 0, 0)';
-		expect(getComputedStyle(cell('1.1.1', 0)).backgroundColor).not.toBe(transparent); // Code
-		expect(getComputedStyle(cell('1.1.1', 5)).backgroundColor).not.toBe(transparent); // Total
-		expect(getComputedStyle(cell('1', 4)).backgroundColor).not.toBe(transparent); // Group Unit price
-		expect(getComputedStyle(cell('1.1.1', 4)).backgroundColor).toBe(transparent); // Line Unit price
-		expect(getComputedStyle(cell('1.1.1', 1)).backgroundColor).toBe(transparent); // Description
+		for (const index of [0, 1, 2, 3, 4, 5]) expect(getComputedStyle(cell('1.1.1', index)).backgroundColor, `column ${index}`).toBe(transparent);
+		// They are muted (Code, Group Unit price) and have a plain cursor; editable cells keep the text cursor.
+		expect(getComputedStyle(cell('1.1.1', 0)).color).not.toBe(getComputedStyle(cell('1.1.1', 1)).color);
+		expect(getComputedStyle(cell('1', 4)).color).not.toBe(getComputedStyle(cell('1.1.1', 4)).color);
+		expect(getComputedStyle(cell('1.1.1', 0)).cursor).toBe('default');
+		expect(getComputedStyle(cell('1.1.1', 1)).cursor).toBe('text');
 
-		const total = getComputedStyle(cell('1.1.1', 5));
-		expect(contrastRatio(total.color, total.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-		const code = cell('1.1.1', 0);
-		const codeText = getComputedStyle(code.querySelector('span')!);
-		expect(contrastRatio(codeText.color, getComputedStyle(code).backgroundColor)).toBeGreaterThanOrEqual(4.5);
+		// WCAG AA (4.5:1) for every cell's text on whatever it sits on, including the tinted Group rows.
+		for (const row of document.querySelectorAll('tbody tr')) {
+			for (const td of row.querySelectorAll('td')) {
+				const text = td.querySelector('input, .code, span') ?? td;
+				const colour = getComputedStyle(text).color;
+				if (!td.textContent?.trim() && !td.querySelector('input')) continue;
+				expect(contrastRatio(colour, effectiveBackground(td)), `${row.getAttribute('data-code')} ${theme}`).toBeGreaterThanOrEqual(4.5);
+			}
+		}
 	});
 
 	it('distinguishes Group rows by weight', async () => {
@@ -239,7 +245,8 @@ describe('inline editing', () => {
 		editor();
 		for (const row of document.querySelectorAll('tbody tr')) {
 			const cells = [...row.querySelectorAll('td')];
-			expect(cells[0].querySelector('input, select, textarea, button'), 'Code').toBeNull();
+			expect(cells[0].querySelector('input, select, textarea'), 'Code').toBeNull();
+			expect(cells[0].querySelectorAll('button:not(.toggle)'), 'Code').toHaveLength(0); // only the disclosure chevron
 			expect(cells[5].querySelector('input, select, textarea, button'), 'Total').toBeNull();
 			if (row.getAttribute('data-kind') === 'group') {
 				expect(cells[4].querySelector('input, select, textarea, button'), 'Group Unit price').toBeNull();
@@ -1895,5 +1902,117 @@ describe('the compact icon toolbar', () => {
 		render(BudgetEditorPage, { budgetId: BUDGET, store: openStore(nested()) });
 		const row = document.querySelector('tbody tr')!.getBoundingClientRect();
 		expect(row.height).toBeLessThanOrEqual(40);
+	});
+});
+
+describe('hierarchy in the table', () => {
+	// 1 Group > 1.1 Group > 1.1.1 Line, 1.1.2 Line; 1.2 Line; 2 Line (three levels deep).
+	const rowsFor = () => openStore([...nested(), item(6, null, '3')]).rows;
+	const row = (code: string) => document.querySelector<HTMLElement>(`tr[data-code="${code}"]`)!;
+	const cell = (code: string, index: number) => row(code).querySelectorAll('td')[index] as HTMLElement;
+	const background = (code: string) => getComputedStyle(cell(code, 1)).backgroundColor;
+	/** Opacity of a computed colour: `rgba(r, g, b, a)` or `color(... / a)`; 1 when there is no alpha part. */
+	const alpha = (colour: string) => {
+		const slash = colour.match(/\/\s*([\d.]+)/);
+		if (slash) return Number(slash[1]);
+		const rgba = colour.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
+		return rgba ? Number(rgba[1]) : 1;
+	};
+
+	it('tints Group rows and leaves Line rows plain, with Group rows heavier too', async () => {
+		render(BudgetSpreadsheet, { rows: rowsFor(), currency: 'EUR' });
+		expect(background('1')).not.toBe('rgba(0, 0, 0, 0)');
+		expect(background('1.1')).not.toBe('rgba(0, 0, 0, 0)');
+		expect(background('1.1.1')).toBe('rgba(0, 0, 0, 0)');
+		expect(background('2')).toBe('rgba(0, 0, 0, 0)');
+		expect(parseInt(getComputedStyle(cell('1', 1)).fontWeight)).toBeGreaterThan(parseInt(getComputedStyle(cell('1.1.1', 1)).fontWeight));
+	});
+
+	it('lightens the tint with depth, so a deeper Group reads as inside a shallower one', async () => {
+		render(BudgetSpreadsheet, { rows: rowsFor(), currency: 'EUR' });
+		expect(alpha(background('1'))).toBeGreaterThan(alpha(background('1.1')));
+	});
+
+	it('draws an accent bar on the left edge of every row inside a Group section, and none outside', async () => {
+		render(BudgetSpreadsheet, { rows: rowsFor(), currency: 'EUR' });
+		for (const code of ['1', '1.1', '1.1.1', '1.1.2', '1.2']) {
+			expect(getComputedStyle(cell(code, 0)).boxShadow, code).not.toBe('none');
+		}
+		expect(getComputedStyle(cell('2', 0)).boxShadow).toBe('none'); // a top-level Line is not in a section
+	});
+
+	it('shows indentation and the chevron before the Code, indenting with depth', async () => {
+		render(BudgetSpreadsheet, {
+			rows: rowsFor(),
+			currency: 'EUR',
+			collapsed: new Set<string>(),
+			ontoggle: () => {}
+		});
+		const left = (code: string, selector: string) => cell(code, 0).querySelector(selector)!.getBoundingClientRect().left;
+		// The chevron comes before the code in the same cell...
+		const group = cell('1.1', 0);
+		const toggle = group.querySelector('.toggle')!;
+		const code = group.querySelector('.code')!;
+		expect(toggle.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		expect(toggle.getBoundingClientRect().right).toBeLessThanOrEqual(code.getBoundingClientRect().left);
+		// ...and the whole thing, code included, steps right with every level.
+		expect(left('1.1', '.code')).toBeGreaterThan(left('1', '.code'));
+		expect(left('1.1.1', '.code')).toBeGreaterThan(left('1.1', '.code'));
+		expect(parseFloat(getComputedStyle(cell('1.1.1', 1)).paddingInlineStart)).toBeGreaterThan(
+			parseFloat(getComputedStyle(cell('1', 1)).paddingInlineStart)
+		);
+	});
+
+	it('aligns the codes of Group and Line rows at the same depth', async () => {
+		const items = [item(1, null, '0'), item(2, 1, '0'), item(3, 2, '1'), item(4, 1, '5'), item(5, 2, '2')]; // 1.1 is a Group, 1.2 a Line
+		render(BudgetSpreadsheet, { rows: openStore(items).rows, currency: 'EUR', collapsed: new Set<string>(), ontoggle: () => {} });
+		const codeLeft = (rowCode: string) => cell(rowCode, 0).querySelector('.code')!.getBoundingClientRect().left;
+		expect(row('1.1').getAttribute('data-kind')).toBe('group');
+		expect(row('1.2').getAttribute('data-kind')).toBe('line');
+		expect(codeLeft('1.1')).toBe(codeLeft('1.2'));
+		expect(cell('1.2', 0).querySelector('.toggle-space')).not.toBeNull(); // the Line's empty spacer
+	});
+
+	it('has no outline around the table, only hairline row separators', async () => {
+		render(BudgetSpreadsheet, { rows: rowsFor(), currency: 'EUR' });
+		const frame = getComputedStyle(document.querySelector('.scroll')!);
+		expect(frame.borderTopWidth).toBe('0px');
+		expect(frame.borderLeftWidth).toBe('0px');
+		expect(getComputedStyle(document.querySelector('table')!).borderTopWidth).toBe('0px');
+		const rowCell = getComputedStyle(cell('1.1.1', 1));
+		expect(rowCell.borderBottomWidth).toBe('1px');
+		expect(rowCell.borderLeftWidth).toBe('0px'); // horizontal lines only, not a boxed grid
+	});
+
+	it('keeps hover visible on top of a Group tint without replacing it', async () => {
+		render(BudgetSpreadsheet, { rows: rowsFor(), currency: 'EUR' });
+		await userEvent.hover(document.body);
+		const tint = background('1.1');
+		await vi.waitFor(() => expect(getComputedStyle(cell('1.1', 1)).backgroundImage).toBe('none'));
+		await userEvent.hover(cell('1.1', 2));
+		await vi.waitFor(() => expect(getComputedStyle(cell('1.1', 1)).backgroundImage).toContain('gradient'));
+		expect(background('1.1')).toBe(tint); // the tint is still there underneath
+	});
+
+	it('shows focus clearly on a tinted Group row', async () => {
+		render(BudgetSpreadsheet, { rows: rowsFor(), currency: 'EUR' });
+		cell('1', 1).focus();
+		const style = getComputedStyle(cell('1', 1));
+		await userEvent.keyboard('{ArrowDown}');
+		expect(style.outlineStyle === 'solid' || getComputedStyle(cell('1.1', 1)).outlineStyle === 'solid').toBe(true);
+	});
+
+	it.each<Theme>(['light', 'dark'])('keeps text at WCAG AA on every row, tinted or not, with hover on top, in %s', async (theme) => {
+		setTheme(theme);
+		render(BudgetSpreadsheet, { rows: rowsFor(), currency: 'EUR' });
+		for (const code of ['1', '1.1', '1.1.1', '1.1.2', '1.2', '2']) {
+			await userEvent.hover(cell(code, 2));
+			for (const td of row(code).querySelectorAll('td')) {
+				const text = td.querySelector('input, .code') ?? td;
+				if (!td.textContent?.trim() && !td.querySelector('input')) continue;
+				const colour = getComputedStyle(text).color;
+				expect(contrastRatio(colour, effectiveBackground(td)), `${code} ${theme}`).toBeGreaterThanOrEqual(4.5);
+			}
+		}
 	});
 });

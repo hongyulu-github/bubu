@@ -1,6 +1,6 @@
 /*
- * BuBu design tokens. Light and cute: the stdf "Cherry" palette (raspberry pink on a pale pink canvas),
- * soft rounded corners, generous spacing. stdf itself is themed through data-theme="Cherry" on <html>.
+ * BuBu design tokens. The colours are the stdf "Starbucks" theme's palette (green and warm neutrals), read from the
+ * variables that data-theme="Starbucks" on <html> defines; type, radius and spacing are the app's own scale.
  * Dark values apply with the OS setting (prefers-color-scheme) unless data-appearance="light" is set
  * on <html>; data-appearance="dark" forces dark. There is deliberately no in-app theme switch.
  * Contrast (WCAG): text pairs >= 4.5:1, control borders >= 3:1 in both themes.
@@ -8,25 +8,30 @@
 :root {
 	color-scheme: light dark;
 
-	/* Colour: light */
-	--color-bg: #fde8f1;
-	--color-surface: #fff7fa;
-	--color-text: #1b0c15;
-	--color-text-secondary: #664d5a;
-	--color-border: #ebc4d7;
-	--color-border-strong: #9d6785;
-	--color-accent: #b20d8f;
-	--color-on-accent: #ffffff;
-	--color-danger: #c8102e;
-	--color-on-danger: #ffffff;
-	--color-focus-ring: #b20d8f;
-	--color-selected: rgb(178 13 143 / 0.12);
-	--color-readonly-bg: #fbdcea;
-	--color-disabled-bg: #f3d6e3;
-	--color-disabled-text: #8f7283;
-	--color-overlay: rgb(0 0 0 / 0.4);
-	--shadow-raised: 0 10px 30px rgb(178 13 143 / 0.18);
-	--shadow-card: 0 2px 10px rgb(178 13 143 / 0.1);
+	/* Colour: every value comes from the stdf Starbucks palette (the --color-primary, --color-bg-*,
+	   --color-text-* variables that data-theme="Starbucks" sets on <html>), never a hard-coded hex. */
+	--color-bg: var(--color-bg-base);
+	--color-surface: var(--color-bg-surface);
+	--color-text: var(--color-text-primary);
+	--color-text-secondary: color-mix(in oklch, var(--color-text-primary) 68%, var(--color-bg-surface));
+	--color-border: color-mix(in oklch, var(--color-text-primary) 13%, var(--color-bg-surface));
+	--color-border-strong: color-mix(in oklch, var(--color-text-primary) 50%, var(--color-bg-surface));
+	--color-accent: var(--color-primary);
+	--color-on-accent: var(--color-text-on-primary);
+	--color-danger: var(--color-error);
+	--color-on-danger: var(--color-bg-surface);
+	--color-focus-ring: var(--color-primary);
+	--color-selected: color-mix(in oklch, var(--color-primary) 16%, transparent);
+	--color-hover: color-mix(in oklch, var(--color-primary) 9%, transparent);
+	/* Table hierarchy: Group rows are tinted by depth (strongest at the top level); the accent bar marks a section. */
+	--tint-depth-0: color-mix(in oklch, var(--color-primary) 11%, transparent);
+	--tint-depth-1: color-mix(in oklch, var(--color-primary) 7%, transparent);
+	--tint-depth-2: color-mix(in oklch, var(--color-primary) 4%, transparent);
+	--color-disabled-bg: color-mix(in oklch, var(--color-text-primary) 8%, var(--color-bg-surface));
+	--color-disabled-text: color-mix(in oklch, var(--color-text-primary) 42%, var(--color-bg-surface));
+	--color-overlay: color-mix(in oklch, var(--color-text-primary) 45%, transparent);
+	--shadow-raised: 0 10px 30px color-mix(in oklch, var(--color-text-primary) 16%, transparent);
+	--shadow-card: 0 2px 10px color-mix(in oklch, var(--color-text-primary) 9%, transparent);
 
 	/* Spacing (4px base) */
 	--space-1: 0.25rem;
@@ -79,56 +84,55 @@
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-appearance='light']) {
-		--color-bg: #1d0b14;
-		--color-surface: #321823;
-		--color-text: #f7e1e9;
-		--color-text-secondary: #c8a2b2;
-		--color-border: #573746;
-		--color-border-strong: #a7758c;
-		--color-accent: #f691cc;
-		--color-on-accent: #1d0b14;
-		--color-danger: #ff7f8d;
-		--color-on-danger: #1d0b14;
-		--color-focus-ring: #f691cc;
-		--color-selected: rgb(246 145 204 / 0.22);
-		--color-readonly-bg: #27111b;
-		--color-disabled-bg: #432633;
-		--color-disabled-text: #a08493;
-		--color-overlay: rgb(0 0 0 / 0.6);
-		--shadow-raised: 0 8px 30px rgb(0 0 0 / 0.5);
-	--shadow-card: 0 2px 10px rgb(0 0 0 / 0.35);
+		--color-bg: var(--color-bg-base-dark);
+		--color-surface: var(--color-bg-surface-dark);
+		--color-text: var(--color-text-dark);
+		--color-text-secondary: color-mix(in oklch, var(--color-text-dark) 70%, var(--color-bg-surface-dark));
+		--color-border: color-mix(in oklch, var(--color-text-dark) 16%, var(--color-bg-surface-dark));
+		--color-border-strong: color-mix(in oklch, var(--color-text-dark) 52%, var(--color-bg-surface-dark));
+		--color-accent: var(--color-dark);
+		--color-on-accent: var(--color-text-on-dark);
+		--color-danger: color-mix(in oklch, var(--color-error) 45%, white);
+		--color-on-danger: var(--color-bg-surface-dark);
+		--color-focus-ring: var(--color-dark);
+		--color-selected: color-mix(in oklch, var(--color-dark) 24%, transparent);
+		--color-hover: color-mix(in oklch, var(--color-dark) 12%, transparent);
+		--tint-depth-0: color-mix(in oklch, var(--color-dark) 14%, transparent);
+		--tint-depth-1: color-mix(in oklch, var(--color-dark) 9%, transparent);
+		--tint-depth-2: color-mix(in oklch, var(--color-dark) 5%, transparent);
+		--color-disabled-bg: color-mix(in oklch, var(--color-text-dark) 10%, var(--color-bg-surface-dark));
+		--color-disabled-text: color-mix(in oklch, var(--color-text-dark) 42%, var(--color-bg-surface-dark));
+		--color-overlay: color-mix(in oklch, black 60%, transparent);
+		--shadow-raised: 0 8px 30px color-mix(in oklch, black 50%, transparent);
+		--shadow-card: 0 2px 10px color-mix(in oklch, black 35%, transparent);
 	}
 }
 
 :root[data-appearance='dark'] {
 	color-scheme: dark;
-	--color-bg: #1d0b14;
-	--color-surface: #321823;
-	--color-text: #f7e1e9;
-	--color-text-secondary: #c8a2b2;
-	--color-border: #573746;
-	--color-border-strong: #a7758c;
-	--color-accent: #f691cc;
-	--color-on-accent: #1d0b14;
-	--color-danger: #ff7f8d;
-	--color-on-danger: #1d0b14;
-	--color-focus-ring: #f691cc;
-	--color-selected: rgb(246 145 204 / 0.22);
-	--color-readonly-bg: #27111b;
-	--color-disabled-bg: #432633;
-	--color-disabled-text: #a08493;
-	--color-overlay: rgb(0 0 0 / 0.6);
-	--shadow-raised: 0 8px 30px rgb(0 0 0 / 0.5);
-	--shadow-card: 0 2px 10px rgb(0 0 0 / 0.35);
+	--color-bg: var(--color-bg-base-dark);
+	--color-surface: var(--color-bg-surface-dark);
+	--color-text: var(--color-text-dark);
+	--color-text-secondary: color-mix(in oklch, var(--color-text-dark) 70%, var(--color-bg-surface-dark));
+	--color-border: color-mix(in oklch, var(--color-text-dark) 16%, var(--color-bg-surface-dark));
+	--color-border-strong: color-mix(in oklch, var(--color-text-dark) 52%, var(--color-bg-surface-dark));
+	--color-accent: var(--color-dark);
+	--color-on-accent: var(--color-text-on-dark);
+	--color-danger: color-mix(in oklch, var(--color-error) 45%, white);
+	--color-on-danger: var(--color-bg-surface-dark);
+	--color-focus-ring: var(--color-dark);
+	--color-selected: color-mix(in oklch, var(--color-dark) 24%, transparent);
+	--color-hover: color-mix(in oklch, var(--color-dark) 12%, transparent);
+	--tint-depth-0: color-mix(in oklch, var(--color-dark) 14%, transparent);
+	--tint-depth-1: color-mix(in oklch, var(--color-dark) 9%, transparent);
+	--tint-depth-2: color-mix(in oklch, var(--color-dark) 5%, transparent);
+	--color-disabled-bg: color-mix(in oklch, var(--color-text-dark) 10%, var(--color-bg-surface-dark));
+	--color-disabled-text: color-mix(in oklch, var(--color-text-dark) 42%, var(--color-bg-surface-dark));
+	--color-overlay: color-mix(in oklch, black 60%, transparent);
+	--shadow-raised: 0 8px 30px color-mix(in oklch, black 50%, transparent);
+	--shadow-card: 0 2px 10px color-mix(in oklch, black 35%, transparent);
 }
 
 :root[data-appearance='light'] {
 	color-scheme: light;
-}
-
-@media (pointer: coarse) {
-	:root {
-		--control-height: var(--control-height-touch);
-		--icon-button-size: var(--control-height-touch);
-	}
 }

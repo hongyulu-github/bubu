@@ -54,15 +54,19 @@
 <style>
 	.cell {
 		padding: var(--space-1) var(--space-3);
-		padding-inline-start: calc(var(--space-3) + min(var(--cell-depth, 0) * var(--space-5), 12rem));
+		padding-inline-start: calc(var(--space-3) + min(var(--cell-depth, 0) * var(--space-4), 12rem));
 		border-bottom: 1px solid var(--color-border);
 		font-size: var(--font-size-callout);
 		text-align: start;
 		font-weight: var(--font-weight-regular);
 		color: var(--color-text);
+		/* Group rows set --row-tint; everything else shares one background. */
+		background-color: var(--row-tint, transparent);
+		cursor: text; /* editable by default: the cursor is part of telling editable from read-only */
 	}
 
 	th.cell {
+		cursor: default;
 		font-size: var(--font-size-footnote);
 		font-weight: var(--font-weight-semibold);
 		letter-spacing: 0.01em;
@@ -74,16 +78,23 @@
 		font-variant-numeric: tabular-nums;
 	}
 
+	/* Read-only values are told apart by a muted colour and a plain cursor, not by a fill. */
 	.readonly {
-		background: var(--color-readonly-bg);
+		color: var(--color-text-secondary);
+		cursor: default;
+	}
+
+	.readonly.strong {
+		color: var(--color-text);
 	}
 
 	.strong {
 		font-weight: var(--font-weight-semibold);
 	}
 
+	/* Overlays, so a Group's tint still shows underneath. */
 	.selected {
-		background: var(--color-selected);
+		background-image: linear-gradient(var(--color-selected), var(--color-selected));
 	}
 
 	.invalid {

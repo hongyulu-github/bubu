@@ -185,7 +185,7 @@
 <div class="scroll">
 	<table role="grid" aria-label="Budget Items" bind:this={table} {onfocusin} {onkeydown}>
 		<colgroup>
-			<col style="width: 5rem" />
+			<col style="width: 9.5rem" />
 			<col />
 			<col style="width: 6.5rem" />
 			<col style="width: 6.5rem" />
@@ -209,10 +209,17 @@
 		<tbody>
 			{#each rows as row (row.id)}
 				{@const group = row.kind === 'group'}
-				<tr data-kind={row.kind} data-code={row.code} data-item-id={row.id} oncontextmenu={(event) => oncontextmenu(event, row)}>
-					<TableCell readonly {...cell(row, 'code')}><span class="code">{row.code}</span></TableCell>
-					<TableCell depth={row.depth} strong={group} {...cell(row, 'description')}>
-						<div class="description">
+				<tr
+					data-kind={row.kind}
+					data-code={row.code}
+					data-item-id={row.id}
+					data-depth={row.depth}
+					data-section={group || row.depth > 0 ? '' : undefined}
+					style:--row-tint={group ? `var(--tint-depth-${Math.min(row.depth, 2)})` : undefined}
+					oncontextmenu={(event) => oncontextmenu(event, row)}
+				>
+					<TableCell readonly depth={row.depth} {...cell(row, 'code')}>
+						<div class="code-cell">
 							{#if ontoggle}
 								{#if group}
 									{@const open = !collapsed.has(row.id)}
@@ -229,6 +236,11 @@
 									<span class="toggle-space" aria-hidden="true"></span>
 								{/if}
 							{/if}
+							<span class="code">{row.code}</span>
+						</div>
+					</TableCell>
+					<TableCell depth={row.depth} strong={group} {...cell(row, 'description')}>
+						<div class="description">
 							{#if onedit}
 								{@render editor(row, 'description', 'Description', row.item.description)}
 							{:else}
@@ -296,11 +308,9 @@
 {/if}
 
 <style>
+	/* No box around the table: hairline row separators only (Apple lists and outline views). */
 	.scroll {
 		overflow-x: auto;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		background: var(--color-surface);
 	}
 
 	table {
@@ -326,11 +336,17 @@
 		gap: var(--space-1);
 	}
 
+	.code-cell {
+		display: flex;
+		align-items: center;
+		gap: var(--space-1);
+	}
+
 	.toggle,
 	.toggle-space {
 		flex: none;
-		width: 1.75rem;
-		height: 1.75rem;
+		width: 1.5rem;
+		height: 1.5rem;
 	}
 
 	.toggle {
@@ -346,7 +362,7 @@
 	}
 
 	.toggle:hover {
-		background: var(--color-readonly-bg);
+		background: var(--color-selected);
 		color: var(--color-text);
 	}
 
@@ -423,6 +439,17 @@
 
 	.new-row td {
 		padding: 0;
+	}
+
+	/* Hierarchy: a coloured bar on the left edge of every row in a top-level Group's section, Group rows
+	   tinted by depth (set per row as --row-tint), indentation and weight in the first columns. None of it
+	   relies on colour alone. Hover is an overlay, so the tint stays visible underneath it. */
+	tbody tr[data-section] :global(.cell:first-child) {
+		box-shadow: inset 3px 0 0 var(--color-accent);
+	}
+
+	tbody tr:hover :global(.cell:not(.selected)) {
+		background-image: linear-gradient(var(--color-hover), var(--color-hover));
 	}
 
 	.code {

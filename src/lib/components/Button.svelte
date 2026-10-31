@@ -28,7 +28,7 @@
 	}
 </script>
 
-<span class="host" {@attach forward}>
+<span class="host" class:destructive={variant === 'destructive'} {@attach forward}>
 	<StdfButton
 		{fill}
 		{state}
@@ -45,6 +45,12 @@
 <style>
 	.host {
 		display: inline-flex;
+	}
+
+	/* The theme's error colour with the app's on-danger text: stdf's own pairing is under 4.5:1 on some themes. */
+	.destructive :global(button:not(:disabled)) {
+		background: var(--color-danger);
+		color: var(--color-on-danger);
 	}
 
 	.host :global(button:focus-visible) {

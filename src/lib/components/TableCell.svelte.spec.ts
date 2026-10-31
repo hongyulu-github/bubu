@@ -2,21 +2,24 @@ import { page, userEvent } from 'vitest/browser';
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
-import { contrastRatio, focusDocument, resetTheme, setTheme, type Theme } from '../testing/theme';
+import '../styles/base.css';
+import { contrastRatio, effectiveBackground, focusDocument, resetTheme, setTheme, type Theme } from '../testing/theme';
 import ReadonlyHost from './__fixtures__/ReadonlyHost.svelte';
 import TableHost from './__fixtures__/TableHost.svelte';
 
 afterEach(resetTheme);
 
 describe('TableCell read-only, strong and depth', () => {
-	it('tints read-only cells and flags them, leaving editable cells untinted', async () => {
+	it('flags read-only cells without any fill: a muted colour and a plain cursor tell them apart', async () => {
 		render(ReadonlyHost);
-		const cells = [...document.querySelectorAll('td')];
-		const [editable, readonly] = cells;
+		const [editable, readonly] = [...document.querySelectorAll('td')];
 		expect(readonly.hasAttribute('data-readonly')).toBe(true);
 		expect(editable.hasAttribute('data-readonly')).toBe(false);
 		expect(getComputedStyle(editable).backgroundColor).toBe('rgba(0, 0, 0, 0)');
-		expect(getComputedStyle(readonly).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+		expect(getComputedStyle(readonly).backgroundColor).toBe('rgba(0, 0, 0, 0)'); // the same background as every cell
+		expect(getComputedStyle(readonly).color).not.toBe(getComputedStyle(editable).color);
+		expect(getComputedStyle(editable).cursor).toBe('text');
+		expect(getComputedStyle(readonly).cursor).toBe('default');
 		expect(readonly.querySelector('input, button, select, textarea')).toBeNull();
 	});
 
@@ -58,16 +61,8 @@ describe('TableCell', () => {
 		setTheme(theme);
 		render(TableHost);
 		for (const name of ['Rent', '1200.50']) {
-			const style = getComputedStyle(page.getByRole('cell', { name }).element());
-			const surface = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim();
-			expect(surface).not.toBe('');
-			expect(contrastRatio(style.color, resolveSurface(surface))).toBeGreaterThanOrEqual(4.5);
+			const cell = page.getByRole('cell', { name }).element();
+			expect(contrastRatio(getComputedStyle(cell).color, effectiveBackground(cell))).toBeGreaterThanOrEqual(4.5);
 		}
 	});
 });
-
-// Token values are hex strings; convert to rgb() for the contrast helper.
-function resolveSurface(hex: string): string {
-	const n = parseInt(hex.slice(1), 16);
-	return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-}

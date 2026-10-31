@@ -21,6 +21,25 @@ function toRgb(value: string): string {
 	return `rgb(${r}, ${g}, ${b})`;
 }
 
+/**
+ * The colour a reader actually sees behind an element: every ancestor's (possibly translucent) background
+ * painted in order, outermost first, over white. Tinted rows are translucent overlays, so one layer is not enough.
+ */
+export function effectiveBackground(element: Element): string {
+	canvas ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+	canvas.clearRect(0, 0, 1, 1);
+	canvas.fillStyle = '#ffffff';
+	canvas.fillRect(0, 0, 1, 1);
+	const layers: string[] = [];
+	for (let node: Element | null = element; node; node = node.parentElement) layers.unshift(getComputedStyle(node).backgroundColor);
+	for (const layer of layers) {
+		canvas.fillStyle = layer;
+		canvas.fillRect(0, 0, 1, 1);
+	}
+	const [r, g, b] = canvas.getImageData(0, 0, 1, 1).data;
+	return `rgb(${r}, ${g}, ${b})`;
+}
+
 function parseRgb(value: string): [number, number, number] {
 	const channels = toRgb(value).match(/[\d.]+/g)?.slice(0, 3).map(Number);
 	if (!channels || channels.length < 3) throw new Error(`Cannot parse colour: ${value}`);

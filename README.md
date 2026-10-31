@@ -38,7 +38,7 @@ Actions are icons, not text buttons: each has an accessible name and a tooltip (
 
 Routes: `/budgets` lists saved Budgets, `/budgets/new` creates an empty one, and `/budgets/<uuid>` opens one. Budget URLs depend on browser-local data, so they are not prerendered: the build emits an SPA fallback (`200.html`) and **the host must serve `/200.html` for any URL it has no file for** (a rewrite; configure this when deploying).
 
-UI: [stdf](https://stdf.dev) components with the Cherry theme on Tailwind 4 (see the update note in [docs/design-foundation.md](docs/design-foundation.md)). Design tokens and base components (`Button`, `Input`, `NumberInput`, `Dialog`, `TableCell`) are documented in [docs/design-foundation.md](docs/design-foundation.md), including source and license. Run `npm run dev` and open `/design` for a live preview.
+UI: [stdf](https://stdf.dev) components with the Starbucks theme on Tailwind 4 (see the update note in [docs/design-foundation.md](docs/design-foundation.md)). Design tokens and base components (`Button`, `Input`, `NumberInput`, `Dialog`, `TableCell`) are documented in [docs/design-foundation.md](docs/design-foundation.md), including source and license. Run `npm run dev` and open `/design` for a live preview.
 
 A tree drag-and-drop prototype lives at `/prototypes/tree-dnd`; integration notes are in [docs/pragmatic-tree-dnd.md](docs/pragmatic-tree-dnd.md).
 

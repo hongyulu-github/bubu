@@ -1,14 +1,14 @@
 # Design foundation
 
-> **Update:** the look is now the [stdf](https://stdf.dev) component library (MIT) with its built-in **Cherry** theme: raspberry pink on a pale pink canvas, big rounded corners, pill-shaped fields. `Button` and the Name fields (`TextField`) are stdf components behind the same app-level wrappers; the grid cell editors, the native `<dialog>` and the currency `<select>` stay native (stdf's Input/Dialog have no per-field aria attributes, refs, `role="dialog"` or Escape handling, which the keyboard grid and accessibility work rely on) and are coloured by the tokens below, which now carry Cherry's palette. The Apple HIG sections below describe the earlier foundation; the accessibility targets (44px controls, 4.5:1 contrast, visible focus) still apply.
+> **Update:** the look is now the [stdf](https://stdf.dev) component library (MIT) with its built-in **Starbucks** theme (green and warm neutrals). Only the colours come from the theme; radius, spacing and type are the app's own tokens. `Button` and the Name fields (`TextField`) are stdf components behind the same app-level wrappers; the grid cell editors, the native `<dialog>` and the currency `<select>` stay native (stdf's Input/Dialog have no per-field aria attributes, refs, `role="dialog"` or Escape handling, which the keyboard grid and accessibility work rely on) and are coloured by the tokens below, which are defined as `color-mix()` and `var()` expressions over the theme's palette variables (never hard-coded hex values). The Apple HIG sections below describe the earlier foundation; the accessibility targets (44px controls, 4.5:1 contrast, visible focus) still apply.
 >
-> - Tailwind 4 + stdf are set up in `src/lib/styles/stdf.css`; `<html data-theme="Cherry">` selects the theme (change `name` there and in `app.html` to re-skin). stdf's theme plugin only defines CSS variables, so the `@theme inline` block in that file registers them as Tailwind colours.
+> - Tailwind 4 + stdf are set up in `src/lib/styles/stdf.css`; `<html data-theme="Starbucks">` selects the theme (change `name` there and in `app.html` to re-skin). stdf's theme plugin only defines CSS variables, so the `@theme inline` block in that file registers them as Tailwind colours.
 > - stdf defaults to Chinese text, so `+layout.svelte` wraps the app in `ConfigProvider locale={en_US}`.
 > - The app's own light/dark switch attribute is `data-appearance` (it used to be `data-theme`, which stdf owns).
 
 Apple-inspired visual foundation for BuBu: CSS tokens plus five base Svelte 5 components.
 
-## LUL-68 redesign (Apple design skill applied to the stdf Cherry theme)
+## LUL-68 redesign (Apple design skill applied to the stdf Starbucks theme)
 
 The `apple-design` skill was run as a design review/improvement pass (platform: desktop-first web app; references read: `accessibility`, `layout`, `typography`, `color`, `buttons`, `menus`, `context-menus`, `toolbars`, `lists-and-tables`, `designing-for-macos`). Decisions, all expressed as tokens in `src/lib/styles/tokens.css` (and applied to stdf through `src/lib/styles/stdf.css`):
 
@@ -20,11 +20,23 @@ The `apple-design` skill was run as a design review/improvement pass (platform: 
 | Icon buttons | One accessible name each (`aria-label`), a tooltip with the shortcut on hover (after a delay) and on keyboard focus, dismissed by Escape; the tooltip is visual only so the name is not announced twice | `toolbars.md`, WCAG 1.4.13 |
 | Menus | "⋯" button and right-click open the same menu: icons, destructive item last and in the danger colour behind a separator, at most three groups, one level | `context-menus.md`, `menus.md` |
 | Toolbar | Undo/Redo and Collapse/Expand all as two icon groups (max three groups); text only where symbols are unclear | `toolbars.md › Item groupings` |
-| Colour | Cherry palette; one colour, one meaning (accent for primary action and links, danger only for destructive); contrast checked in tests | `color.md` |
+| Colour | Starbucks palette, derived from the theme variables in light and dark; one colour, one meaning (accent for primary action and links, danger only for destructive); contrast checked in tests | `color.md` |
 
 New shared components (`src/lib/components`): `Icon`, `IconButton` (stdf `Button` underneath, plus tooltip), `Menu` (popover menu with arrow-key navigation), `MoreMenu`. stdf's own `Tooltip` (click only) and `ActionPopover` (no menu roles or keyboard handling) were not usable for the accessibility requirements, so those two behaviours are built here on the shared tokens.
 
 Editor: the table spans the window (page padding only), rows are compact, row actions are hover/focus icon buttons plus a right-click menu (touch screens keep them visible), "New item" is the last row, and the Budget name renames in place (double-click, or the pencil, which is the keyboard route).
+
+### Table hierarchy and cells (LUL-68 follow-up)
+
+Guided by `outline-views.md` ("Expose data hierarchy in the first column only", disclosure triangles, indentation) and `lists-and-tables.md` (separators, optional alternating rows). Combination chosen, kept subtle:
+
+- **Group rows** get a translucent tint of the theme accent that fades with depth (`--tint-depth-0/1/2`: 11%, 7%, 4% in light) and heavier text, so they read as section headers.
+- **Accent bar:** a 3px bar of the theme accent on the left edge of every row inside a top-level Group's section (the Group and all its descendants), so each section is easy to follow. Top-level Lines have none.
+- **First column carries the structure:** disclosure chevron, then the Code, indented per level; Lines get an empty spacer of the chevron's width so Codes align at the same depth. The Description indents with depth too.
+- Not used: depth-coloured rainbows, vertical guide lines (extra ink for information the first column already gives) and zebra stripes.
+- **Not colour alone:** indentation, weight, chevrons and the Codes themselves say the same thing. Hover and selection are overlays (`linear-gradient`) on top of the tint; the cell focus ring is unchanged.
+- **Cells:** no fill for read-only cells. Editable cells show a text cursor and the field border on hover and focus; read-only values (Code, Group Unit price) are muted with a default cursor; Total stays full-strength and bold. The table has no outline, only 1px row separators.
+- **Contrast:** tests compute WCAG contrast of every cell's text on its real background (all translucent layers composited) in light and dark, including hover.
 
 ## Source and license
 
