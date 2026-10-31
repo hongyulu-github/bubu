@@ -24,6 +24,8 @@ The `apple-design` skill was run as a design review/improvement pass (platform: 
 
 New shared components (`src/lib/components`): `Icon`, `IconButton` (stdf `Button` underneath, plus tooltip), `Menu` (popover menu with arrow-key navigation), `MoreMenu`. stdf's own `Tooltip` (click only) and `ActionPopover` (no menu roles or keyboard handling) were not usable for the accessibility requirements, so those two behaviours are built here on the shared tokens.
 
+Budgets list: a plain list, not boxed cards: bold name, then currency and item count, the Budget's total on the right, hairline separators, a soft highlight on hover, and the "⋯" menu revealed on hover or focus (always visible on touch screens).
+
 Editor: the table spans the window (page padding only), rows are compact, row actions are hover/focus icon buttons (touch screens keep them visible; no right-click menu in the table, so the browser menu works in cells), "New item" is the last row, and the Budget name renames in place (double-click, or the pencil, which is the keyboard route).
 
 ### Table hierarchy and cells (LUL-68 follow-up)

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { calculateBudget } from '../budget/calculate';
+	import { formatMoney } from '../budget/currency';
 	import Menu, { type MenuItem } from '../components/Menu.svelte';
 	import MoreMenu from '../components/MoreMenu.svelte';
 	import type { Budget } from '../budget/model';
@@ -79,6 +81,15 @@
 		return `${count} ${count === 1 ? 'item' : 'items'}`;
 	};
 
+	/** The Budget's grand total for the list; a Budget whose Items cannot be summed just shows none. */
+	function totalLabel(budget: Budget): string {
+		try {
+			return formatMoney(calculateBudget(store.itemsOf(budget.id)).grandTotal, budget.currency);
+		} catch {
+			return '';
+		}
+	}
+
 	const unreadable = $derived(store.loadIssues.filter((issue) => issue.budgetId !== undefined));
 </script>
 
@@ -115,13 +126,18 @@
 				{#each budgets as budget (budget.id)}
 					<li oncontextmenu={(event) => oncontextmenu(event, budget)}>
 						<a href="/budgets/{budget.id}">
-							<span class="name">{budget.name}</span>
-							<span class="meta">
-								<span class="currency">{budget.currency}</span>
-								<span class="count">{itemsLabel(budget.id)}</span>
+							<span class="text">
+								<span class="name">{budget.name}</span>
+								<span class="meta">
+									<span class="currency">{budget.currency}</span>
+									<span class="count">{itemsLabel(budget.id)}</span>
+								</span>
 							</span>
+							<span class="total">{totalLabel(budget)}</span>
 						</a>
-						<MoreMenu label="Actions for {budget.name}" items={actionsFor(budget)} />
+						<span class="actions">
+							<MoreMenu label="Actions for {budget.name}" items={actionsFor(budget)} />
+						</span>
 					</li>
 				{/each}
 			</ul>
@@ -193,44 +209,85 @@
 		gap: var(--space-3);
 	}
 
-	/* A card: the title leads, the quiet details sit underneath, the actions wait behind "⋯". */
+	/* A plain list, not boxed cards: hairline separators, a soft highlight on hover, actions on demand. */
+	ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
 	li {
 		display: flex;
 		align-items: center;
-		gap: var(--space-3);
-		padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		background: var(--color-surface);
-		transition:
-			border-color var(--duration-fast),
-			box-shadow var(--duration-fast);
+		gap: var(--space-2);
+		padding: var(--space-1);
+		border-bottom: 1px solid var(--color-border);
 	}
 
-	li:hover {
-		border-color: var(--color-border-strong);
-		box-shadow: var(--shadow-card);
+	li:last-child {
+		border-bottom: none;
 	}
 
 	ul a {
 		display: flex;
 		flex: 1;
-		flex-direction: column;
-		gap: 2px;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-4);
 		min-width: 0;
+		padding: var(--space-3) var(--space-3);
+		border-radius: var(--radius-md);
 		color: var(--color-text);
 		text-decoration: none;
+		transition: background-color var(--duration-fast);
+	}
+
+	ul a:hover {
+		background: var(--color-hover);
 	}
 
 	ul a:focus-visible {
 		outline: var(--focus-ring-width) solid var(--color-focus-ring);
-		outline-offset: var(--focus-ring-offset);
-		border-radius: var(--radius-sm);
+		outline-offset: calc(var(--focus-ring-width) * -1);
+	}
+
+	.text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.total {
+		flex: none;
+		color: var(--color-text-secondary);
+		font-size: var(--font-size-callout);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.actions {
+		flex: none;
+		opacity: 0;
+		transition: opacity var(--duration-fast);
+	}
+
+	li:hover .actions,
+	li:focus-within .actions,
+	.actions:has(:global([aria-expanded='true'])) {
+		opacity: 1;
+	}
+
+	@media (hover: none) {
+		.actions {
+			opacity: 1;
+		}
 	}
 
 	.name {
 		font-size: var(--font-size-title2);
-		font-weight: var(--font-weight-bold);
+		font-weight: var(--font-weight-semibold);
 		line-height: var(--line-height-tight);
 		letter-spacing: -0.005em;
 		overflow-wrap: anywhere;

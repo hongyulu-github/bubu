@@ -1,5 +1,5 @@
 import { page, userEvent } from 'vitest/browser';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
 import '../styles/base.css';
@@ -112,6 +112,35 @@ describe('BudgetsList', () => {
 		expect(store.itemsOf(A)).toBe(originalBefore);
 		expect(store.canUndo(A)).toBe(false);
 		expect(store.canUndo(copy.id)).toBe(true);
+	});
+
+	it('is a plain list: no boxed items, hairline separators between them', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		const items = [...document.querySelectorAll('main ul li')];
+		expect(items).toHaveLength(2);
+		const [first, last] = items.map((item) => getComputedStyle(item));
+		expect(first.borderLeftWidth).toBe('0px');
+		expect(first.borderTopWidth).toBe('0px');
+		expect(first.boxShadow).toBe('none');
+		expect(first.borderBottomWidth).toBe('1px'); // a hairline between rows...
+		expect(last.borderBottomWidth).toBe('0px'); // ...and none after the last
+	});
+
+	it('shows each Budget\'s name, currency, item count and total, and reveals "⋯" on hover or focus', async () => {
+		seed();
+		render(BudgetsList, { store: newStore() });
+		const link = page.getByRole('link', { name: /Wedding/ });
+		await expect.element(link).toHaveTextContent(/Wedding/);
+		expect(link.element().textContent).toMatch(/items?/);
+		const actions = link.element().closest('li')!.querySelector<HTMLElement>('.actions')!; // this Budget's, not the first row's
+		await userEvent.hover(document.body);
+		await vi.waitFor(() => expect(getComputedStyle(actions).opacity).toBe('0'));
+		await userEvent.hover(link.element());
+		await vi.waitFor(() => expect(getComputedStyle(actions).opacity).toBe('1'));
+		await userEvent.hover(document.body);
+		page.getByRole('button', { name: 'Actions for Wedding' }).element().focus();
+		await vi.waitFor(() => expect(getComputedStyle(actions).opacity).toBe('1')); // keyboard focus reveals it too
 	});
 
 	it('offers a "⋯" menu per Budget with Rename, Duplicate and Delete, named for the Budget', async () => {
