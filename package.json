@@ -36,6 +36,7 @@
 	"dependencies": {
 		"@atlaskit/pragmatic-drag-and-drop": "^4.0.0",
 		"@atlaskit/pragmatic-drag-and-drop-hitbox": "^3.0.0",
+		"exceljs": "^4.4.0",
 		"stdf": "^3.0.0"
 	}
 }
