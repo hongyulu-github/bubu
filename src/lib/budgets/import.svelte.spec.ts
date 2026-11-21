@@ -57,7 +57,7 @@ function setup({ seedA = true } = {}) {
 	const store = new BudgetStore({ storage, history: new CommandHistory() });
 	store.hydrate();
 	const onCreated = vi.fn();
-	render(CreateBudgetForm, { store, onCreated });
+	render(CreateBudgetForm, { store, onCreated, oncancel: vi.fn() });
 	return { fake, storage, store, onCreated };
 }
 
@@ -132,7 +132,7 @@ describe('importing an Excel workbook', () => {
 		const before = snapshot(fake);
 		const budgets = store.budgets;
 		await upload(await plainFile([['1', 'Venue', 1, null, 100, 100]]));
-		await page.getByRole('button', { name: 'Cancel' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click(); // the dialog's, not the form's
 
 		await expect.element(dialog()).not.toBeInTheDocument();
 		expect(snapshot(fake)).toBe(before);
@@ -150,7 +150,7 @@ describe('a Budget that is already saved', () => {
 		await upload(await exportedFile());
 
 		await expect.element(page.getByRole('dialog', { name: '“Wedding (old)” is already saved' })).toBeVisible();
-		await page.getByRole('button', { name: 'Cancel' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click(); // the dialog's, not the form's
 
 		await expect.element(dialog()).not.toBeInTheDocument();
 		expect(snapshot(fake)).toBe(before);

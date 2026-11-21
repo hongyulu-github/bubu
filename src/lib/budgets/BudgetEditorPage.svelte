@@ -167,7 +167,7 @@
 <svelte:window {onkeydown} />
 
 <main>
-	<p><a class="back" href="/budgets">← All Budgets</a></p>
+	<p><a class="back" href="/?budgets">← All Budgets</a></p>
 
 	{#if store.hydrationStatus === 'idle'}
 		<p class="note" role="status">Loading Budget…</p>

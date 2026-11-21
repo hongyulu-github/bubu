@@ -23,8 +23,9 @@ function setup(options: { hydrate?: boolean; withExistingBudget?: boolean } = {}
 	const store = new BudgetStore({ history: new CommandHistory() });
 	if (hydrate) store.hydrate();
 	const onCreated = vi.fn();
-	render(CreateBudgetForm, { store, onCreated });
-	return { store, onCreated };
+	const oncancel = vi.fn();
+	render(CreateBudgetForm, { store, onCreated, oncancel });
+	return { store, onCreated, oncancel };
 }
 
 const name = () => page.getByLabelText('Name');
@@ -37,7 +38,6 @@ afterEach(() => localStorage.clear());
 describe('CreateBudgetForm', () => {
 	it('has a labelled name field, a currency choice and no errors to start with', async () => {
 		setup();
-		await expect.element(page.getByRole('heading', { name: 'New Budget' })).toBeVisible();
 		await expect.element(name()).toBeVisible();
 		await expect.element(currency()).toHaveValue('');
 		await expect.element(name()).not.toHaveAttribute('aria-invalid');
@@ -158,9 +158,14 @@ describe('CreateBudgetForm', () => {
 		await expect.element(create()).toBeEnabled();
 	});
 
-	it('links back to the Budgets list', async () => {
-		setup();
-		await expect.element(page.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/budgets');
+	it('has a Cancel button that calls back and creates nothing', async () => {
+		const { store, onCreated, oncancel } = setup();
+		await name().fill('Typed but not created');
+		await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+		expect(oncancel).toHaveBeenCalledOnce();
+		expect(onCreated).not.toHaveBeenCalled();
+		expect(store.budgets).toEqual([]);
+		expect(page.getByRole('link', { name: 'Cancel' }).elements()).toHaveLength(0); // a button, not a link to a page
 	});
 
 	describe('Download an empty template', () => {

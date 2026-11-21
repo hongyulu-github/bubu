@@ -106,7 +106,10 @@ async function chooseFile(buffer: Buffer, name = 'budget.xlsx') {
 	await page.waitForLoadState('networkidle'); // hydrated before a file is chosen
 	await page.locator('input[type="file"]').setInputFiles({ name, mimeType: XLSX, buffer });
 }
-const dialog = () => page.getByRole('dialog');
+// The import dialog opens on top of the Budgets drawer, so it is the last (innermost) dialog on the page.
+const dialog = () => page.getByRole('dialog').last();
+/** The import dialog that asks for a Budget name, on top of the drawer's own form, which has fields with the same labels. */
+const nameDialog = () => page.getByRole('dialog', { name: 'Name this Budget' });
 const press = (name: string) => dialog().getByRole('button', { name, exact: true }).click();
 
 /** What the editor shows for the open Budget: every row's Code and cells, and the grand total. */
@@ -235,8 +238,8 @@ describe('import without BuBu metadata', () => {
 
 	it('imports the downloaded empty template as an empty Budget after asking for a name and currency', async () => {
 		await chooseFile(await templateWith([]));
-		await dialog().getByLabel('Name').fill('Blank');
-		await dialog().getByLabel('Currency').selectOption('SEK');
+		await nameDialog().getByLabel('Name').fill('Blank');
+		await nameDialog().getByLabel('Currency').selectOption('SEK');
 		await press('Import Budget');
 		await page.waitForURL(/\/budgets\/[0-9a-f-]{36}$/);
 		const id = page.url().split('/').pop()!;
@@ -254,8 +257,8 @@ describe('import without BuBu metadata', () => {
 			)
 		);
 		await chooseFile(file);
-		await dialog().getByLabel('Name').fill('From template');
-		await dialog().getByLabel('Currency').selectOption('EUR');
+		await nameDialog().getByLabel('Name').fill('From template');
+		await nameDialog().getByLabel('Currency').selectOption('EUR');
 		await press('Import Budget');
 		await page.waitForURL(/\/budgets\/[0-9a-f-]{36}$/);
 		const id = page.url().split('/').pop()!;
@@ -291,7 +294,7 @@ describe('files that must be refused, and cancelled imports', () => {
 		await shown.waitFor();
 		for (const text of expected) expect(await shown.innerText()).toContain(text);
 		await press('Close');
-		expect(page.url()).toBe(`${baseUrl}/budgets/new`); // still on the form, nothing opened
+		expect(page.url()).toBe(`${baseUrl}/`); // still on the main page, nothing opened
 		expect(await stored()).toEqual(before); // not a byte changed
 	};
 
@@ -358,14 +361,14 @@ describe('files that must be refused, and cancelled imports', () => {
 
 		await chooseFile(file);
 		await press('Cancel');
-		await dialog().waitFor({ state: 'detached' });
+		await page.getByRole('dialog', { name: /already saved/ }).waitFor({ state: 'detached' });
 		await chooseFile(file);
 		await press('Replace…');
 		await press('Back');
 		await press('Cancel');
-		await dialog().waitFor({ state: 'detached' });
+		await page.getByRole('dialog', { name: /already saved/ }).waitFor({ state: 'detached' });
 
-		expect(page.url()).toBe(`${baseUrl}/budgets/new`);
+		expect(page.url()).toBe(`${baseUrl}/`);
 		expect(await stored()).toEqual(before);
 	});
 
@@ -374,7 +377,7 @@ describe('files that must be refused, and cancelled imports', () => {
 		const before = await stored();
 		await chooseFile(template);
 		await press('Cancel');
-		await dialog().waitFor({ state: 'detached' });
+		await page.getByRole('dialog', { name: 'Name this Budget' }).waitFor({ state: 'detached' });
 		expect(await stored()).toEqual(before);
 	});
 });
@@ -403,7 +406,7 @@ describe('a failure while saving leaves no partial Budget', () => {
 		await shown.waitFor();
 		expect(await shown.innerText()).toContain('Nothing was changed');
 		expect(await stored()).toEqual(before);
-		expect(page.url()).toBe(`${baseUrl}/budgets/new`);
+		expect(page.url()).toBe(`${baseUrl}/`);
 	});
 
 	it('leaves a replaced Budget exactly as it was when the replacement cannot be saved', async () => {

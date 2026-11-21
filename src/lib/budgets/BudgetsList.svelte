@@ -6,11 +6,17 @@
 	import MoreMenu from '../components/MoreMenu.svelte';
 	import type { Budget } from '../budget/model';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
-	import ConfirmClearDataDialog from './ConfirmClearDataDialog.svelte';
 	import ConfirmDeleteBudgetDialog from './ConfirmDeleteBudgetDialog.svelte';
 	import RenameBudgetDialog from './RenameBudgetDialog.svelte';
 
-	let { store = budgetStore }: { store?: BudgetStore } = $props();
+	let {
+		store = budgetStore,
+		announcement = ''
+	}: {
+		store?: BudgetStore;
+		/** Something that happened elsewhere (clearing all data), announced with the list's own messages. */
+		announcement?: string;
+	} = $props();
 
 	// Most recently changed first; name and id keep the order stable.
 	const budgets = $derived(
@@ -36,20 +42,7 @@
 		message = result.ok ? `Deleted “${budget.name}”.` : `“${budget.name}” could not be deleted.`;
 		// The deleted row (and the button that opened the dialog) is gone; land on a stable control.
 		await tick();
-		document.querySelector<HTMLElement>('[data-new-budget]')?.focus();
-	}
-
-	let confirmingClear = $state(false);
-
-	// Rare and permanent, so it lives in the "⋯" menu (destructive item, red, with an ellipsis because it asks
-	// again) and not as a button on the page; the dialog is the real confirmation.
-	const pageActions: MenuItem[] = [
-		{ id: 'clear', label: 'Clear all BuBu data…', icon: 'trash', destructive: true, onselect: () => (confirmingClear = true) }
-	];
-
-	function confirmClear() {
-		const result = store.clearAll();
-		message = result.ok ? 'All BuBu data was cleared.' : 'BuBu data could not be cleared.';
+		document.querySelector<HTMLElement>('[data-budgets-list]')?.focus();
 	}
 
 	/** Copy a Budget, then move focus to the copy so keyboard users land on what was made. */
@@ -107,23 +100,14 @@
 	const unreadable = $derived(store.loadIssues.filter((issue) => issue.budgetId !== undefined));
 </script>
 
-<main>
-	<header>
-		<h1>Your Budgets</h1>
-		<div class="bar">
-			<a class="new" href="/budgets/new" data-new-budget>New Budget</a>
-			{#if store.hydrationStatus === 'ready' && store.budgets.length > 0}
-				<MoreMenu label="More actions" items={pageActions} />
-			{/if}
-		</div>
-	</header>
-
+<!-- Focus lands here after a Budget is deleted: the row and the menu that opened its dialog are gone. -->
+<div class="list" tabindex="-1" data-budgets-list>
 	{#if store.hydrationStatus === 'idle'}
 		<p class="note" role="status">Loading your Budgets…</p>
 	{:else if store.hydrationStatus === 'unavailable'}
 		<p class="note" role="alert">Browser storage is not available, so saved Budgets cannot be shown.</p>
 	{:else}
-		<p class="visually-hidden" role="status">{message}</p>
+		<p class="visually-hidden" role="status">{message || announcement}</p>
 		<ConfirmDeleteBudgetDialog
 			budget={pendingDelete}
 			itemCount={pendingDelete ? store.itemsOf(pendingDelete.id).length : 0}
@@ -162,8 +146,6 @@
 			</ul>
 		{/if}
 
-		<ConfirmClearDataDialog budgetCount={store.budgets.length} bind:open={confirmingClear} onconfirm={confirmClear} />
-
 		{#if renamingId}
 			<RenameBudgetDialog budgetId={renamingId} bind:open={renaming} {store} />
 		{/if}
@@ -176,55 +158,17 @@
 			/>
 		{/if}
 	{/if}
-</main>
+</div>
 
 <style>
-	main {
-		max-width: 40rem;
-		margin: 0 auto;
-		padding: var(--space-6) var(--space-4);
+	.list {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
 	}
 
-	header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-4);
-	}
-
-	.bar {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-	}
-
-	h1 {
-		margin: 0;
-		font-size: var(--font-size-display);
-		font-weight: var(--font-weight-bold);
-		line-height: var(--line-height-tight);
-		letter-spacing: -0.01em;
-	}
-
-	.new {
-		display: inline-flex;
-		align-items: center;
-		min-height: var(--control-height);
-		padding: 0 var(--space-4);
-		border-radius: var(--radius-md);
-		background: var(--color-accent);
-		color: var(--color-on-accent);
-		font-size: var(--font-size-callout);
-		font-weight: var(--font-weight-semibold);
-		text-decoration: none;
-	}
-
-	.new:focus-visible {
-		outline: var(--focus-ring-width) solid var(--color-focus-ring);
-		outline-offset: var(--focus-ring-offset);
+	.list:focus-visible {
+		outline: none;
 	}
 
 	ul {

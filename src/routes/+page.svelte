@@ -1,11 +1,19 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import LandingPage from '#lib/landing/LandingPage.svelte';
+	import Landing from '#lib/landing/Landing.svelte';
+
+	let landing: ReturnType<typeof Landing>;
+
+	// "/?budgets" is where the editor's back link and the old /budgets address lead, "/?new" the old /budgets/new:
+	// open the drawer on that view, then tidy the address so a reload or a close does not reopen it.
+	onMount(() => {
+		const asked = new URLSearchParams(location.search);
+		const view = asked.has('new') ? 'new' : asked.has('budgets') ? 'list' : null;
+		if (!view) return;
+		landing.show(view);
+		void goto('/', { replace: true, reset: false });
+	});
 </script>
 
-<!--
-	The main page for new and returning users alike. "Create a budget" starts the normal creation flow (an empty
-	Budget, no Items). "My budgets" is meant to open the saved-Budgets side drawer (LUL-73); until that exists it
-	opens the standalone list.
--->
-<LandingPage oncreate={() => goto('/budgets/new')} onopenbudgets={() => goto('/budgets')} />
+<Landing bind:this={landing} navigate={(path) => goto(path)} />

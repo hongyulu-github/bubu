@@ -12,11 +12,13 @@
 
 	let {
 		store = budgetStore,
-		onCreated
+		onCreated,
+		oncancel
 	}: {
 		store?: BudgetStore;
 		/** Called after the Budget is in shared state; the caller opens its editor. */
 		onCreated: (budget: Budget) => void;
+		oncancel: () => void;
 	} = $props();
 
 	let name = $state('');
@@ -52,8 +54,7 @@
 	}
 </script>
 
-<main>
-	<h1>New Budget</h1>
+<div class="form-body">
 	<form bind:this={form} novalidate onsubmit={submit}>
 		<Input label="Name" bind:value={name} error={errors.name} autocomplete="off" />
 		<Select
@@ -65,7 +66,7 @@
 			error={errors.currency}
 		/>
 		<div class="actions">
-			<a class="cancel" href="/budgets">Cancel</a>
+			<button type="button" class="cancel" onclick={oncancel}>Cancel</button>
 			<Button type="submit" variant="primary" disabled={store.hydrationStatus === 'idle'}>Create Budget</Button>
 		</div>
 	</form>
@@ -78,24 +79,13 @@
 	{#if templateFailed}
 		<p class="alt problem" role="alert">The template could not be created. Please try again.</p>
 	{/if}
-</main>
+</div>
 
 <style>
-	main {
-		max-width: 28rem;
-		margin: 0 auto;
-		padding: var(--space-6) var(--space-4);
+	.form-body {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);
-	}
-
-	h1 {
-		margin: 0;
-		font-size: var(--font-size-display);
-		font-weight: var(--font-weight-bold);
-		line-height: var(--line-height-tight);
-		letter-spacing: -0.01em;
 	}
 
 	form {
@@ -113,6 +103,11 @@
 	}
 
 	.cancel {
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		cursor: pointer;
 		color: var(--color-accent);
 		font-size: var(--font-size-callout);
 		font-weight: var(--font-weight-semibold);
