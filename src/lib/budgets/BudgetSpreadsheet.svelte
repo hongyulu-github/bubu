@@ -12,6 +12,7 @@
 	} from '../budget/grid';
 	import { formatAmount } from '../budget/currency';
 	import { toString } from '../budget/numbers';
+	import { DRAG_HANDLE, monitorRowDrops, rowDrag, type DropRequest } from '../editor/drag';
 	import Icon from '../components/Icon.svelte';
 	import IconButton from '../components/IconButton.svelte';
 	import TableCell from '../components/TableCell.svelte';
@@ -39,9 +40,14 @@
 		collapsed?: ReadonlySet<string>;
 		/** Collapse or expand a Group. Shows a toggle on every Group row when given. */
 		ontoggle?: (groupId: string) => void;
+		/**
+		 * A row was dropped on another: which Item, onto which, and before, after or inside it. Makes
+		 * every row draggable when given. Nothing here changes the Items; the caller accepts or ignores it.
+		 */
+		onmove?: (request: DropRequest) => void;
 	}
 
-	let { rows, currency, onedit, onadd, ondelete, onaddchild, onnewitem, collapsed = new Set<string>(), ontoggle }: Props = $props();
+	let { rows, currency, onedit, onadd, ondelete, onaddchild, onnewitem, collapsed = new Set<string>(), ontoggle, onmove }: Props = $props();
 
 	// --- Keyboard: which cell is active, and whether it is being edited -----------------------------
 	// Navigation focuses the cell itself; editing focuses the input inside it. Both are read from real
@@ -69,6 +75,8 @@
 		void footHeight;
 		measureScroll();
 	});
+	$effect(() => (onmove ? monitorRowDrops(onmove) : undefined));
+
 	let active = $state.raw<(Cell & { index: number }) | null>(null);
 
 	/** Attributes that make a data cell a focusable grid cell with a roving tab stop. */
@@ -224,8 +232,11 @@
 					data-depth={row.depth}
 					data-section={group || row.depth > 0 ? '' : undefined}
 					style:--row-tint={group ? `var(--tint-depth-${Math.min(row.depth, 2)})` : undefined}
+					{@attach onmove
+						? rowDrag({ id: row.id, depth: row.depth, expanded: group && !collapsed.has(row.id) })
+						: undefined}
 				>
-					<TableCell readonly depth={row.depth} {...cell(row, 'code')}>
+					<TableCell readonly depth={row.depth} {...{ [DRAG_HANDLE]: '' }} {...cell(row, 'code')}>
 						<div class="code-cell">
 							{#if ontoggle}
 								{#if group}

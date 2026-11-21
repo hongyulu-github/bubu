@@ -98,6 +98,9 @@
 		if (added.ok) await focusDescription(added.item.id);
 	}
 
+	/** Rows can be dragged, but no move handler exists yet (LUL-14): a drop is reported and ignored. */
+	function ignoreMove() {}
+
 	async function addTopLevel() {
 		const added = store.addTopLevelItem(budgetId);
 		if (added.ok) await focusDescription(added.item.id);
@@ -182,6 +185,7 @@
 					ondelete={requestDelete}
 					onaddchild={addChild}
 					onnewitem={addTopLevel}
+					onmove={ignoreMove}
 				/>
 			</div>
 		{/if}
