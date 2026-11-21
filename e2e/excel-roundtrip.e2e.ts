@@ -76,7 +76,7 @@ async function seed(budget: Budget, items: Item[]) {
 		[`bubu:budget:${budget.id}`, budget, `bubu:items:${budget.id}`, items] as const
 	);
 }
-/** Every BuBu key with its raw text, sorted: equal snapshots mean not a byte changed. */
+/** Every Bubu key with its raw text, sorted: equal snapshots mean not a byte changed. */
 const stored = () =>
 	page.evaluate(() =>
 		Object.keys(localStorage)
@@ -225,7 +225,7 @@ describe('round trip: import as a copy', () => {
 	});
 });
 
-describe('import without BuBu metadata', () => {
+describe('import without Bubu metadata', () => {
 	const rowsOf = (...rows: unknown[][]) => rows;
 	async function templateWith(rows: unknown[][]) {
 		const template = await downloadFrom('/budgets/new', 'Download an empty template');

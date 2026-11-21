@@ -301,7 +301,7 @@ export class BudgetStore {
 	}
 
 	/**
-	 * Remove every BuBu Budget: the `bubu:` keys in browser storage (through the storage module, so
+	 * Remove every Bubu Budget: the `bubu:` keys in browser storage (through the storage module, so
 	 * nothing else in localStorage is touched), the Budgets and Items in memory, and every undo history.
 	 * Storage is cleared first; if that fails nothing changes. Not an Item command: it cannot be undone.
 	 * The caller confirms first. The autosave path then sees an empty state and writes nothing.

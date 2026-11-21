@@ -94,7 +94,7 @@ describe('importing an Excel workbook', () => {
 		expect(fake.data.has(`bubu:budget:${A}`) && fake.data.has(`bubu:items:${A}`)).toBe(true);
 	});
 
-	it('asks for a name and currency when the workbook has no BuBu details, and adds no starter Items', async () => {
+	it('asks for a name and currency when the workbook has no Bubu details, and adds no starter Items', async () => {
 		const { store, onCreated } = setup();
 		await upload(await plainFile([['1', 'Venue', 1, null, 100, 100], ['1.1', 'Hall', 2, 'days', 30, 60]]));
 

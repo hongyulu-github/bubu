@@ -22,7 +22,7 @@ import type { ValidatedRow } from './validate';
  */
 export interface ImportInput {
 	rows: readonly ValidatedRow[];
-	/** From `validateBudgetWorkbook`; null for a workbook without BuBu metadata. */
+	/** From `validateBudgetWorkbook`; null for a workbook without Bubu metadata. */
 	metadata: WorkbookMetadata | null;
 	/** Name and currency for a new Budget; required when there is no metadata. */
 	budget?: { name: string; currency: string };

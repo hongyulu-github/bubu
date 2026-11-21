@@ -117,7 +117,7 @@
 		step?.kind === 'errors'
 			? `${describeProblemCount(step.errors.length)}. Nothing was changed. Fix these in Excel and import the file again.`
 			: step?.kind === 'details'
-				? 'This workbook has no BuBu details, so it will be imported as a new Budget.'
+				? 'This workbook has no Bubu details, so it will be imported as a new Budget.'
 				: step?.kind === 'conflict'
 					? 'This workbook is an export of a Budget you already have. Keep both by importing a copy, or replace the saved one with the workbook.'
 					: step?.kind === 'confirm-replace'

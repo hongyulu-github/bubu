@@ -9,7 +9,7 @@
 	async function run() {
 		try {
 			const workbook = await createWorkbook();
-			workbook.addWorksheet('Budget').getCell('A1').value = 'BuBu';
+			workbook.addWorksheet('Budget').getCell('A1').value = 'bubu';
 			const blob = await writeWorkbook(workbook);
 			const again = await readWorkbook(await blob.arrayBuffer());
 			result = `OK: ${blob.size} bytes, ${blob.type}, A1 = ${again.getWorksheet('Budget')?.getCell('A1').value}`;

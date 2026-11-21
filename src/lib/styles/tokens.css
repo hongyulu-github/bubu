@@ -1,5 +1,5 @@
 /*
- * BuBu design tokens. The colours are the app's palette (green and warm neutrals), read from the variables that
+ * Bubu design tokens. The colours are the app's palette (green and warm neutrals), read from the variables that
  * theme.css defines on <html>; type, radius and spacing are the app's own scale.
  * Dark values apply with the OS setting (prefers-color-scheme) unless data-appearance="light" is set
  * on <html>; data-appearance="dark" forces dark. There is deliberately no in-app theme switch.

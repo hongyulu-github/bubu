@@ -5,7 +5,7 @@ import { buildItemTree } from '../budget/tree';
 import { isUuid, validateBudget } from '../budget/validation';
 
 /**
- * The BuBu workbook contract (LUL-63) and its hidden metadata.
+ * The Bubu workbook contract (LUL-63) and its hidden metadata.
  *
  * Visible sheet "Budget": row 1 is the header (Code, Description, Quantity, Unit, Unit price, Total) and
  * the Items follow in display order. An export puts a Grand total row (no Code, the label "Grand total")
@@ -13,7 +13,7 @@ import { isUuid, validateBudget } from '../budget/validation';
  * metadata records the row of every Item, and the decoder skips the Grand total row. The six columns are
  * all there is to see.
  *
- * Hidden sheet "BuBu metadata" holds what those columns cannot: the format version, the Budget document,
+ * Hidden sheet "Bubu metadata" holds what those columns cannot: the format version, the Budget document,
  * and for every Item its UUID, its visible row and Code, its parent and its exact Quantity and Unit
  * price as text. Codes only identify rows here; they are never an Item field. The visible sheet decides
  * every editable value: a number the user left alone keeps its exact stored digits, a changed one wins.
@@ -22,7 +22,7 @@ import { isUuid, validateBudget } from '../budget/validation';
  */
 export const METADATA_VERSION = 1;
 export const BUDGET_SHEET = 'Budget';
-export const METADATA_SHEET = 'BuBu metadata';
+export const METADATA_SHEET = 'Bubu metadata';
 /** The label of the exporter's Grand total row, which sits under the header and is not an Item. */
 export const GRAND_TOTAL_LABEL = 'Grand total';
 export const VISIBLE_COLUMNS = ['Code', 'Description', 'Quantity', 'Unit', 'Unit price', 'Total'] as const;
@@ -136,7 +136,7 @@ const cellText = (sheet: Worksheet, row: number, column: number) => textOf(sheet
  */
 export function readMetadata(workbook: Workbook): ReadMetadataResult {
 	const sheet = workbook.getWorksheet(METADATA_SHEET);
-	if (!sheet) return { ok: false, issues: [issue('missing-metadata', 'This workbook has no BuBu metadata, so it is not a BuBu export.')] };
+	if (!sheet) return { ok: false, issues: [issue('missing-metadata', 'This workbook has no Bubu metadata, so it is not a Bubu export.')] };
 
 	const rawVersion = cellText(sheet, 1, 2);
 	const version = /^\d+$/.test(rawVersion) ? Number(rawVersion) : NaN;
@@ -225,7 +225,7 @@ function decimalFrom(value: CellValue | undefined, saved: string | undefined, pa
 }
 
 /**
- * Decode a BuBu workbook: the metadata, then each visible row matched to its saved identity.
+ * Decode a Bubu workbook: the metadata, then each visible row matched to its saved identity.
  *
  * An identity attaches to a row only when the row number and the Code both match what was saved, and
  * its parent is the row above it in the hierarchy. A Code that moved to another row, or a row whose

@@ -206,7 +206,7 @@ describe('with metadata (a real export, through the file)', () => {
 
 	it('works on a workbook whose metadata was removed: a plain import with fresh identities', async () => {
 		const workbook = await exported();
-		workbook.removeWorksheet(workbook.getWorksheet('BuBu metadata')!.id);
+		workbook.removeWorksheet(workbook.getWorksheet('Bubu metadata')!.id);
 		const { rows, metadata } = await validated(workbook);
 		expect(metadata).toBeNull();
 		const { items, budget } = build({ rows, metadata });

@@ -208,7 +208,7 @@ describe('hierarchy and Codes', () => {
 	});
 });
 
-describe('BuBu metadata', () => {
+describe('Bubu metadata', () => {
 	const budget = (): Budget => createBudget({ id: '11111111-1111-4111-8111-111111111111', name: 'Wedding', currency: 'EUR', now: new Date('2026-02-01T00:00:00.000Z') });
 	const items = (): Item[] => [
 		createItem({ id: '00000000-0000-4000-8000-000000000001', budgetId: budget().id, sortIndex: 0, description: 'Venue', quantity: '2' }),

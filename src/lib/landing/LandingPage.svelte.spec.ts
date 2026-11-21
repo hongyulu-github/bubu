@@ -20,10 +20,10 @@ const text = () => document.body.innerText;
 const occurrences = (pattern: RegExp) => (text().match(pattern) ?? []).length;
 
 describe('the name', () => {
-	it('is BuBu: the mark at the top left and the page title, with no logo yet', async () => {
+	it('is bubu: the mark at the top left and the page title, with no logo yet', async () => {
 		setup();
-		expect(document.querySelector('.brand')!.textContent).toBe('BuBu');
-		expect(document.title).toContain('BuBu');
+		expect(document.querySelector('.brand')!.textContent).toBe('bubu');
+		expect(document.title).toContain('bubu');
 		expect(document.querySelector('header img, header svg')).toBeNull(); // text until a logo exists
 	});
 });

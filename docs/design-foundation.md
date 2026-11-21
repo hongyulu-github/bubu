@@ -8,7 +8,7 @@
 > - **Square corners:** every radius is 0. `tokens.css` sets the `--radius-*` tokens to 0, and `theme.css` has one unlayered `border-radius: 0` rule on all elements, which also beats Flowbite's `rounded-*` classes. Do not add rounding to a component; change that rule if the decision changes.
 > - The app's own light/dark switch attribute is `data-appearance`.
 
-Apple-inspired visual foundation for BuBu: CSS tokens plus five base Svelte 5 components.
+Apple-inspired visual foundation for Bubu: CSS tokens plus five base Svelte 5 components.
 
 ## LUL-68 redesign (Apple design skill applied to the Starbucks palette)
 

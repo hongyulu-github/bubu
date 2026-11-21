@@ -1,6 +1,6 @@
 # bubu
 
-BuBu is a budget builder. This repository holds the application source code only. Budgets are stored in users' browsers and are not version controlled.
+Bubu is a budget builder. This repository holds the application source code only. Budgets are stored in users' browsers and are not version controlled.
 
 ## Repository
 
@@ -10,7 +10,7 @@ BuBu is a budget builder. This repository holds the application source code only
 
 ## Development
 
-BuBu is a static, client-only SvelteKit app (Svelte 5 runes, TypeScript, `adapter-static`). There are no server endpoints or accounts. Requires Node 22+.
+Bubu is a static, client-only SvelteKit app (Svelte 5 runes, TypeScript, `adapter-static`). There are no server endpoints or accounts. Requires Node 22+.
 
 ```sh
 npm install

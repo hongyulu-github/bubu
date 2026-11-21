@@ -4,7 +4,7 @@ import { createWorkbook, writeWorkbook } from './workbook';
 export const TEMPLATE_FILENAME = 'bubu-budget-template.xlsx';
 
 /**
- * An empty workbook for entering a Budget outside BuBu: the visible Budget sheet with its six headers
+ * An empty workbook for entering a Budget outside Bubu: the visible Budget sheet with its six headers
  * and no rows. It has no metadata sheet, so nothing says it belongs to an existing Budget; importing it
  * makes a new one.
  */

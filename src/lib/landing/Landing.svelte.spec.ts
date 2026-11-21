@@ -296,12 +296,12 @@ describe('selecting and managing Budgets in the drawer', () => {
 		await expect.element(drawer('My budgets')).toBeVisible(); // still open
 	});
 
-	it('keeps the "⋯" menu with Clear all BuBu data, hidden when nothing is saved', async () => {
+	it('keeps the "⋯" menu with Clear all Bubu data, hidden when nothing is saved', async () => {
 		setup();
 		await mine().click();
 		await settled();
 		await page.getByRole('button', { name: 'More actions' }).click();
-		await expect.element(page.getByRole('menuitem', { name: 'Clear all BuBu data…' })).toBeVisible();
+		await expect.element(page.getByRole('menuitem', { name: 'Clear all Bubu data…' })).toBeVisible();
 	});
 });
 
@@ -368,13 +368,13 @@ describe('the empty Budgets drawer', () => {
 		expect(store.itemsOf(store.budgets[0].id)).toHaveLength(0); // no template, no placeholder Item
 	});
 
-	it('after clearing all BuBu data shows the same state, and its action still creates a Budget', async () => {
+	it('after clearing all Bubu data shows the same state, and its action still creates a Budget', async () => {
 		const { store, navigate } = setup();
 		await mine().click();
 		await settled();
 		await page.getByRole('button', { name: 'More actions' }).click();
-		await page.getByRole('menuitem', { name: 'Clear all BuBu data…' }).click();
-		await page.getByRole('dialog', { name: 'Clear all BuBu data?' }).getByRole('button', { name: 'Clear all BuBu data' }).click();
+		await page.getByRole('menuitem', { name: 'Clear all Bubu data…' }).click();
+		await page.getByRole('dialog', { name: 'Clear all Bubu data?' }).getByRole('button', { name: 'Clear all Bubu data' }).click();
 		await expect.element(page.getByRole('heading', { name: 'No saved Budgets yet.' })).toBeVisible();
 		expect(store.budgets).toHaveLength(0);
 

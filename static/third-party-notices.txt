@@ -1,10 +1,10 @@
 Third-party notices
 
-BuBu includes the software listed below. Each is used under its own licence, reproduced here as it requires.
+Bubu includes the software listed below. Each is used under its own licence, reproduced here as it requires.
 
 --------------------------------------------------------------------------------
 ExcelJS 4.4.0 (https://github.com/exceljs/exceljs)
-Reads and writes the .xlsx workbooks BuBu imports and exports, in the browser.
+Reads and writes the .xlsx workbooks Bubu imports and exports, in the browser.
 --------------------------------------------------------------------------------
 
 The MIT License (MIT)
