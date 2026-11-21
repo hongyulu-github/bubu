@@ -228,6 +228,7 @@ describe('files that cannot be imported', () => {
 		const shown = page.getByRole('dialog', { name: 'This workbook cannot be imported' });
 		await expect.element(shown).toBeVisible();
 		await expect.element(shown).toHaveTextContent('Nothing was changed');
+		await expect.element(shown).toHaveTextContent('4 problems found in this workbook');
 		await expect.element(shown).toHaveTextContent('Row 2 · Quantity (C2)');
 		await expect.element(shown).toHaveTextContent('Row 3 · Unit price (E3)');
 		await expect.element(shown).toHaveTextContent('Row 4 · Code (A4)');
@@ -274,7 +275,7 @@ describe('persistence failure', () => {
 		fake.failKeys = ['bubu:budget:']; // the Items get written, then the document fails
 		await upload(await exportedFile());
 
-		const shown = page.getByRole('dialog', { name: 'The Budget could not be imported' });
+		const shown = page.getByRole('dialog', { name: 'Excel import failed' });
 		await expect.element(shown).toBeVisible();
 		await expect.element(shown).toHaveTextContent('Nothing was changed');
 		fake.failKeys = [];
@@ -292,7 +293,7 @@ describe('persistence failure', () => {
 		fake.failKeys = ['bubu:budget:'];
 		await page.getByRole('button', { name: 'Replace Budget' }).click();
 
-		await expect.element(page.getByRole('dialog', { name: 'The Budget could not be imported' })).toBeVisible();
+		await expect.element(page.getByRole('dialog', { name: 'Excel import failed' })).toBeVisible();
 		fake.failKeys = [];
 		expect(snapshot(fake)).toBe(before);
 		expect(store.itemsOf(A)).toBe(itemsA);

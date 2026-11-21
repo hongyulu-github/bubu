@@ -8,6 +8,8 @@
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Select from '../components/Select.svelte';
+	import StatusMessage from '../components/StatusMessage.svelte';
+	import { EXCEL_FAILURES } from '../errors/messages';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import type { BudgetTemplate } from '../templates/templates';
 
@@ -86,7 +88,7 @@
 	</div>
 	{/if}
 	{#if templateFailed}
-		<p class="alt problem" role="alert">The template could not be created. Please try again.</p>
+		<StatusMessage title={EXCEL_FAILURES.template.title}>{EXCEL_FAILURES.template.detail}</StatusMessage>
 	{/if}
 </div>
 
@@ -127,10 +129,6 @@
 		margin: 0;
 		color: var(--color-text-secondary);
 		font-size: var(--font-size-callout);
-	}
-
-	.problem {
-		color: var(--color-danger);
 	}
 
 	.link {

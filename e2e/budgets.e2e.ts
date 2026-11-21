@@ -544,7 +544,7 @@ describe('Everything is saved automatically (built static site)', () => {
 		await page.getByLabel('Description 2', { exact: true }).fill('Unsaved');
 		await page.keyboard.press('Enter');
 		await page.getByRole('alert').waitFor();
-		expect(await page.getByRole('alert').innerText()).toContain('Your changes are not being saved');
+		expect(await page.getByRole('alert').innerText()).toContain('Your latest changes are not being saved');
 		expect(await page.getByLabel('Description 2', { exact: true }).inputValue()).toBe('Unsaved'); // still there
 
 		await page.evaluate(() => ((window as unknown as { __failWrites: boolean }).__failWrites = false));
