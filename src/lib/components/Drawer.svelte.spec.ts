@@ -112,7 +112,7 @@ describe('Drawer (Flowbite Drawer)', () => {
 
 	it('shows the controls beside the title, left of Close', async () => {
 		await open();
-		const labels = [...drawer().element().querySelectorAll('header button')].map((button) => button.textContent?.trim() || button.getAttribute('aria-label'));
+		const labels = [...drawer().element().querySelectorAll('[data-drawer-header] button')].map((button) => button.textContent?.trim() || button.getAttribute('aria-label'));
 		expect(labels).toEqual(['Menu', 'Close']);
 	});
 

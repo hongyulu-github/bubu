@@ -250,7 +250,9 @@
 	style:scroll-padding-top="{headHeight}px"
 	style:scroll-padding-bottom="{footHeight}px"
 >
-	<table role="grid" aria-label="Budget Items" bind:this={table} {onfocusin} {onkeydown}>
+	<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+	<!-- A treegrid, not a grid: the Items are a hierarchy, so each row says its level and each Group row whether it is open. -->
+	<table role="treegrid" aria-label="Budget Items" bind:this={table} {onfocusin} {onkeydown}>
 		<colgroup>
 			<col style="width: 9.5rem" />
 			<col />
@@ -281,6 +283,8 @@
 					data-code={row.code}
 					data-item-id={row.id}
 					data-depth={row.depth}
+					aria-level={row.depth + 1}
+					aria-expanded={group ? !collapsed.has(row.id) : undefined}
 					data-section={group || row.depth > 0 ? '' : undefined}
 					style:--row-tint={group ? `var(--tint-depth-${Math.min(row.depth, 2)})` : undefined}
 					data-drop={indicator?.rowId === row.id ? indicator.kind : undefined}

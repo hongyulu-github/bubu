@@ -102,7 +102,7 @@ describe('the Budgets drawer', () => {
 		setup();
 		await mine().click();
 		await settled();
-		const header = page.getByRole('dialog').element().querySelector('header')!;
+		const header = page.getByRole('dialog').element().querySelector('[data-drawer-header]')!;
 		expect([...header.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual(['More actions', 'Close']);
 	});
 

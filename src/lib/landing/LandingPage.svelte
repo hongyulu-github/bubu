@@ -8,6 +8,7 @@
 	let {
 		oncreate,
 		onopenbudgets,
+		drawer = null,
 		showcases,
 		donate
 	}: {
@@ -15,6 +16,8 @@
 		oncreate: () => void;
 		/** Open the saved-Budgets side drawer. It never starts creation. */
 		onopenbudgets: () => void;
+		/** What the side drawer shows right now ('list' or 'new'), or null while it is closed: the buttons that open it say so. */
+		drawer?: 'list' | 'new' | null;
 		/** Room for separate use-case showcases. They sit below the first screen, and nothing shows until they are given. */
 		showcases?: Snippet;
 		/** Where donating happens (a link or button), once that is decided. Nothing is shown there until it is given. */
@@ -40,8 +43,8 @@
 			<h1 id="hero-title">Build a Budget, one Item at a time</h1>
 			<p class="lead">Plan a Budget as a tree of Items. Every Total adds up on its own.</p>
 			<div class="actions">
-				<Button variant="primary" onclick={oncreate}>Create a budget</Button>
-				<Button onclick={onopenbudgets}>My budgets</Button>
+				<Button variant="primary" onclick={oncreate} aria-haspopup="dialog" aria-expanded={drawer === 'new'}>Create a budget</Button>
+				<Button onclick={onopenbudgets} aria-haspopup="dialog" aria-expanded={drawer === 'list'}>My budgets</Button>
 			</div>
 			<dl class="promises">
 				<div>
