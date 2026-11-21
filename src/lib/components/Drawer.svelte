@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { prefersReducedMotion } from 'svelte/motion';
+	import { Popup } from 'stdf';
 	import IconButton from './IconButton.svelte';
+	import { lockModal } from './modal';
 
 	interface Props {
 		open?: boolean;
@@ -8,48 +11,59 @@
 		children?: Snippet;
 		/** Controls beside the title, left of the close button (for example a "⋯" menu). */
 		actions?: Snippet;
-		/** Called when the drawer is closed by the close button, Escape or a click on the backdrop. */
+		/** Called when the drawer is closed by the close button, Escape or a click on the dimmed page. */
 		onclose?: () => void;
 	}
 
-	let { open = $bindable(false), title, children, actions, onclose }: Props = $props();
+	let { open = $bindable(false), title, children: body, actions, onclose }: Props = $props();
 
 	const id = $props.id();
 	const titleId = `${id}-title`;
 
-	/**
-	 * A side panel over the page, built on the native modal dialog like `Dialog`: the page behind it is inert,
-	 * focus stays inside, Escape closes it, and focus returns to what opened it.
-	 */
-	function modal(node: HTMLDialogElement) {
-		const returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-		node.showModal();
-		return () => {
-			if (node.open) node.close();
-			returnFocusTo?.focus();
-		};
-	}
+	// The drawer slides in from the right edge by its own width, and out again a little faster. Popup needs that
+	// distance spelled out because the panel sets its own width; with reduced motion there is no movement at all.
+	let windowWidth = $state(0);
+	const drawerWidth = $derived.by(() => {
+		if (typeof window === 'undefined') return 0;
+		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+		return Math.min(windowWidth, Math.max(28 * rem, windowWidth / 3));
+	});
+	const still = $derived(prefersReducedMotion.current);
 
 	function close() {
 		open = false;
 		onclose?.();
 	}
+
+	// The page lock, focus handling and Escape are on only while `open`. This effect belongs to the component, not to the
+	// panel inside Popup, so it ends the moment `open` turns false, while the panel is still sliding out.
+	let panel = $state<HTMLElement>();
+	$effect(() => {
+		if (open && panel) return lockModal(panel, close);
+	});
 </script>
 
-{#if open}
-	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-	<dialog
-		{@attach modal}
-		aria-labelledby={titleId}
-		oncancel={(event) => {
-			event.preventDefault();
-			close();
-		}}
-		onclick={(event) => {
-			if (event.target === event.currentTarget) close();
-		}}
-	>
-		<div class="panel">
+<svelte:window bind:innerWidth={windowWidth} />
+
+<!--
+	stdf's Popup draws the side panel and the dimming and closes on a click outside, sliding in and out. It is
+	`transparent` and `size={0}` so the panel below sets its own look and width (a third of the window, never narrower
+	than the form needs). stdf has no dialog behaviour, so `modal` adds focus handling, Escape and the page lock.
+-->
+<Popup
+	bind:visible={open}
+	position="right"
+	size={0}
+	transitionDistance={drawerWidth}
+	duration={still ? 0 : 300}
+	outDuration={still ? 0 : 220}
+	easeType="cubicOut"
+	easeOutType="cubicIn"
+	transparent
+	{onclose}
+>
+	{#snippet children()}
+		<div class="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} tabindex="-1" bind:this={panel}>
 			<header>
 				<h2 id={titleId}>{title}</h2>
 				<div class="controls">
@@ -57,22 +71,18 @@
 					<IconButton icon="close" label="Close" onclick={close} />
 				</div>
 			</header>
-			<div class="body">{@render children?.()}</div>
+			<div class="body">{@render body?.()}</div>
 		</div>
-	</dialog>
-{/if}
+	{/snippet}
+</Popup>
 
 <style>
-	/* Pinned to the right edge, full height, a third of the window wide (never narrower than a phone-sized form needs).
-	   It appears at once, with no sliding. Tailwind's reset zeroes margins, so auto margins place it. */
-	dialog {
-		margin: 0 0 0 auto;
+	.drawer {
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
 		width: min(100vw, max(28rem, 33.34vw));
-		max-width: none; /* the browser's own dialog rule would leave a gap at the edge on a narrow screen */
-		height: 100dvh;
-		max-height: 100dvh;
-		padding: 0;
-		border: none;
+		height: 100%;
 		border-left: 1px solid var(--color-border);
 		border-radius: var(--radius-xl) 0 0 var(--radius-xl);
 		background: var(--color-surface);
@@ -81,18 +91,8 @@
 		overflow: hidden;
 	}
 
-	dialog::backdrop {
-		background: var(--color-overlay);
-	}
-
-	dialog:focus-visible {
+	.drawer:focus-visible {
 		outline: none;
-	}
-
-	.panel {
-		display: flex;
-		flex-direction: column;
-		height: 100%;
 	}
 
 	header {

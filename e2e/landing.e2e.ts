@@ -180,12 +180,12 @@ describe('the landing page (built static site)', () => {
 		await page.goto(`${baseUrl}/budgets`);
 		await drawer('My budgets').waitFor();
 		await page.getByRole('link', { name: /Wedding/ }).waitFor();
-		expect(page.url()).toBe(`${baseUrl}/`);
+		await page.waitForURL(`${baseUrl}/`);
 
 		await page.goto(`${baseUrl}/budgets/new`);
 		await drawer('New budget').waitFor();
 		await page.getByLabel('Name').waitFor();
-		expect(page.url()).toBe(`${baseUrl}/`);
+		await page.waitForURL(`${baseUrl}/`);
 	});
 
 	it('the editor\'s back link returns to the main page with the saved Budgets drawer open', async () => {
@@ -196,7 +196,7 @@ describe('the landing page (built static site)', () => {
 		await page.getByRole('link', { name: /All Budgets/ }).click();
 		await drawer('My budgets').waitFor();
 		await page.getByRole('link', { name: /Wedding/ }).waitFor();
-		expect(page.url()).toBe(`${baseUrl}/`); // the main page, with a clean address
+		await page.waitForURL(`${baseUrl}/`); // the main page, with a clean address
 		await page.getByRole('heading', { level: 1, name: 'Build a Budget, one Item at a time' }).waitFor();
 
 		await page.reload(); // a reload does not reopen it

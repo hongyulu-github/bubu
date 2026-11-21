@@ -10,6 +10,7 @@ import { CommandHistory } from '../history/commands';
 import { BudgetStore } from '../state/budgets.svelte';
 import { createBubuStorage } from '../storage/bubu';
 import { FakeStorage } from '../testing/fake-storage';
+import { settled } from '../testing/motion';
 import Landing from './Landing.svelte';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -54,6 +55,7 @@ describe('the Budgets drawer', () => {
 		await expect.element(create()).toBeVisible();
 		await expect.element(mine()).toBeVisible();
 		await mine().click();
+		await settled();
 		await expect.element(page.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
 		expect(newInDrawer().elements()).toHaveLength(0); // "Create a budget" on the page is the way to start one
 		expect(page.getByRole('button', { name: /new budget/i }).elements()).toHaveLength(0);
@@ -64,6 +66,7 @@ describe('the Budgets drawer', () => {
 			await page.viewport(width, height);
 			const screen = render(Landing, { store: new BudgetStore({ history: new CommandHistory() }), navigate: vi.fn() });
 			await mine().click();
+		await settled();
 			await expect.element(drawer('My budgets')).toBeVisible();
 			const rect = page.getByRole('dialog').element().getBoundingClientRect();
 			const window = document.documentElement.clientWidth; // the real width of the page: the test frame is not exactly what was asked
@@ -81,23 +84,23 @@ describe('the Budgets drawer', () => {
 		expect(Math.abs(phone.rect.width - phone.window)).toBeLessThanOrEqual(2);
 	});
 
-	it('appears at once, with no slide-in animation', async () => {
+	it('slides in smoothly from the right and ends in place, not jumping in', async () => {
 		await page.viewport(1440, 900);
 		setup();
 		await mine().click();
-		const dialog = page.getByRole('dialog').element();
-		const panel = dialog.querySelector('.panel')!;
-		// in its final place the moment it exists, with nothing moving
-		expect(Math.abs(dialog.getBoundingClientRect().right - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
-		expect(Math.abs(panel.getBoundingClientRect().left - dialog.getBoundingClientRect().left)).toBeLessThanOrEqual(1);
-		expect(getComputedStyle(panel).transform).toBe('none');
-		expect(getComputedStyle(panel).animationName).toBe('none');
-		expect(document.getAnimations().filter((animation) => dialog.contains((animation.effect as KeyframeEffect | null)?.target ?? null))).toHaveLength(0);
+		await expect.poll(() => document.getAnimations().length).toBeGreaterThan(0); // it is moving
+		const drawer = page.getByRole('dialog').element();
+		// somewhere between off-screen and in place at the start of the move, then exactly in place
+		const clientWidth = document.documentElement.clientWidth;
+		await settled();
+		expect(Math.abs(drawer.getBoundingClientRect().right - clientWidth)).toBeLessThanOrEqual(2);
+		expect(drawer.getBoundingClientRect().left).toBeLessThan(clientWidth - 400); // and it really is on the screen
 	});
 
 	it('puts the "⋯" menu in the header, to the right of the title, and nothing else but Close beside it', async () => {
 		setup();
 		await mine().click();
+		await settled();
 		const header = page.getByRole('dialog').element().querySelector('header')!;
 		expect([...header.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual(['More actions', 'Close']);
 	});
@@ -117,6 +120,7 @@ describe('the Budgets drawer', () => {
 		setup();
 		expect(page.getByRole('dialog').elements()).toHaveLength(0);
 		await mine().click();
+		await settled();
 
 		await expect.element(drawer('My budgets')).toBeVisible();
 		await expect.element(page.getByRole('link', { name: /Wedding/ })).toBeVisible();
@@ -127,6 +131,7 @@ describe('the Budgets drawer', () => {
 	it('lists every saved Budget with its name, currency and Total, and links each to its own editor', async () => {
 		setup();
 		await mine().click();
+		await settled();
 		const wedding = page.getByRole('link', { name: /Wedding/ });
 		await expect.element(wedding).toHaveAttribute('href', `/budgets/${A}`);
 		await expect.element(wedding).toHaveTextContent('EUR');
@@ -143,10 +148,11 @@ describe('the Budgets drawer', () => {
 		for (const close of [
 			() => page.getByRole('button', { name: 'Close', exact: true }).click(),
 			() => userEvent.keyboard('{Escape}'),
-			// a click on the backdrop reaches the drawer element itself (not something inside it)
-			async () => void page.getByRole('dialog').element().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+			// a click on the dimmed page: stdf draws that as a button laid over everything, just before the panel
+			async () => void (page.getByRole('dialog').element().closest('div.fixed')!.previousElementSibling as HTMLElement).click()
 		]) {
 			await mine().click();
+		await settled();
 			await expect.element(drawer('My budgets')).toBeVisible();
 			await close();
 			await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
@@ -159,6 +165,7 @@ describe('the Budgets drawer', () => {
 	it('returns focus to the "My budgets" button when it closes', async () => {
 		setup();
 		await mine().click();
+		await settled();
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
 		await expect.element(mine()).toHaveFocus();
 	});
@@ -166,6 +173,7 @@ describe('the Budgets drawer', () => {
 	it('shows the empty state in the drawer when nothing is saved, with no menu to clear', async () => {
 		setup({ saved: false });
 		await mine().click();
+		await settled();
 		await expect.element(page.getByText('No saved Budgets yet.')).toBeVisible();
 		expect(page.getByRole('button', { name: 'More actions' }).elements()).toHaveLength(0);
 	});
@@ -175,6 +183,7 @@ describe('creating a Budget from the page button', () => {
 	it('"Create a budget" opens the drawer on the new-Budget form, not the list', async () => {
 		setup();
 		await create().click();
+		await settled();
 		await expect.element(drawer('New budget')).toBeVisible();
 		await expect.element(page.getByLabelText('Name')).toBeVisible();
 		await expect.element(page.getByLabelText('Currency')).toBeVisible();
@@ -184,6 +193,7 @@ describe('creating a Budget from the page button', () => {
 	it('makes an empty Budget from the page button and opens its editor, with no Items and a zero grand total', async () => {
 		const { store, navigate } = setup();
 		await create().click();
+		await settled();
 		await submit('From the page', 'GBP');
 
 		await expect.poll(() => navigate.mock.calls.length).toBe(1);
@@ -200,6 +210,7 @@ describe('creating a Budget from the page button', () => {
 		const wedding = store.budgets.find((b) => b.id === A);
 		const items = store.itemsOf(A);
 		await create().click();
+		await settled();
 		await submit('Another');
 		await expect.poll(() => store.budgets.length).toBe(3);
 		expect(store.budgets.find((b) => b.id === A)).toBe(wedding);
@@ -209,6 +220,7 @@ describe('creating a Budget from the page button', () => {
 	it('checks the form as before: a blank name is not saved', async () => {
 		const { store, navigate } = setup();
 		await create().click();
+		await settled();
 		await page.getByRole('button', { name: 'Create Budget', exact: true }).click();
 		await expect.element(page.getByText('Enter a name')).toBeVisible();
 		expect(store.budgets).toHaveLength(2);
@@ -218,6 +230,7 @@ describe('creating a Budget from the page button', () => {
 	it('Cancel closes the drawer and creates nothing', async () => {
 		const { store, navigate } = setup();
 		await create().click();
+		await settled();
 		await page.getByLabelText('Name').fill('Typed but not created');
 		await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
@@ -228,6 +241,7 @@ describe('creating a Budget from the page button', () => {
 	it('keeps the template download and the Excel import in the form', async () => {
 		setup();
 		await create().click();
+		await settled();
 		await expect.element(page.getByRole('button', { name: 'Download an empty template' })).toBeVisible();
 		await expect.element(page.getByRole('button', { name: 'Import an Excel workbook' })).toBeVisible();
 	});
@@ -242,6 +256,7 @@ describe('selecting and managing Budgets in the drawer', () => {
 		document.addEventListener('click', stop, true);
 		try {
 			await mine().click();
+		await settled();
 			for (const name of [/Wedding/, /Renovation/]) await page.getByRole('link', { name }).click();
 		} finally {
 			document.removeEventListener('click', stop, true);
@@ -253,6 +268,7 @@ describe('selecting and managing Budgets in the drawer', () => {
 	it('keeps every list action: rename, duplicate and delete, from each Budget\'s menu', async () => {
 		const { store } = setup();
 		await mine().click();
+		await settled();
 		await page.getByRole('button', { name: 'Actions for Wedding' }).click();
 		for (const item of ['Rename', 'Duplicate', 'Delete']) await expect.element(page.getByRole('menuitem', { name: item })).toBeVisible();
 
@@ -265,6 +281,7 @@ describe('selecting and managing Budgets in the drawer', () => {
 	it('keeps rename and delete working inside the drawer, with their own dialogs', async () => {
 		const { store } = setup();
 		await mine().click();
+		await settled();
 
 		await page.getByRole('button', { name: 'Actions for Renovation' }).click();
 		await page.getByRole('menuitem', { name: 'Rename' }).click();
@@ -281,6 +298,7 @@ describe('selecting and managing Budgets in the drawer', () => {
 	it('keeps the "⋯" menu with Clear all BuBu data, hidden when nothing is saved', async () => {
 		setup();
 		await mine().click();
+		await settled();
 		await page.getByRole('button', { name: 'More actions' }).click();
 		await expect.element(page.getByRole('menuitem', { name: 'Clear all BuBu data…' })).toBeVisible();
 	});

@@ -1,6 +1,6 @@
 # Design foundation
 
-> **Update:** the look is now the [stdf](https://stdf.dev) component library (MIT) with its built-in **Starbucks** theme (green and warm neutrals). Only the colours come from the theme; radius, spacing and type are the app's own tokens. `Button` is the stdf component behind an app-level wrapper; the form fields (`Input`, `Select`), the grid cell editors and the native `<dialog>` stay native, sharing one field look (surface fill, one border, the shared radius, semibold label above, custom select chevron), (stdf's Input has a different markup that cannot match the select, and it and its Dialog have no per-field aria attributes, refs, `role="dialog"` or Escape handling, which the keyboard grid and accessibility work rely on) and are coloured by the tokens below, which are defined as `color-mix()` and `var()` expressions over the theme's palette variables (never hard-coded hex values). The Apple HIG sections below describe the earlier foundation; the accessibility targets (44px controls, 4.5:1 contrast, visible focus) still apply.
+> **Update:** the look is now the [stdf](https://stdf.dev) component library (MIT) with its built-in **Starbucks** theme (green and warm neutrals). Only the colours come from the theme; radius, spacing and type are the app's own tokens. `Button` is the stdf component behind an app-level wrapper; the form fields (`Input`, `Select`) and the grid cell editors stay native, sharing one field look (surface fill, one border, the shared radius, semibold label above, custom select chevron), (stdf's Input has a different markup that cannot match the select and no per-field aria attributes or refs; see the stdf audit below) and are coloured by the tokens below, which are defined as `color-mix()` and `var()` expressions over the theme's palette variables (never hard-coded hex values). The Apple HIG sections below describe the earlier foundation; the accessibility targets (44px controls, 4.5:1 contrast, visible focus) still apply.
 >
 > - Tailwind 4 + stdf are set up in `src/lib/styles/stdf.css`; `<html data-theme="Starbucks">` selects the theme (change `name` there and in `app.html` to re-skin). stdf's theme plugin only defines CSS variables, so the `@theme inline` block in that file registers them as Tailwind colours.
 > - stdf defaults to Chinese text, so `+layout.svelte` wraps the app in `ConfigProvider locale={en_US}`.
@@ -42,6 +42,27 @@ Guided by `outline-views.md` ("Expose data hierarchy in the first column only", 
 - **Cells:** no fill for read-only cells. Editable cells show a text cursor and the field border on hover and focus; read-only values (Code, Group Unit price) are muted with a default cursor; Total stays full-strength and bold. The table has no outline, only 1px row separators.
 - **Contrast:** tests compute WCAG contrast of every cell's text on its real background (all translucent layers composited) in light and dark, including hover.
 
+## stdf audit: what is stdf, what is not, and why
+
+Rule: look in `node_modules/stdf/dist/components` before building a UI component, use stdf's when it can do the job, and write down here why it was not used when it could not. Checked by rendering each candidate in a browser and by searching its source for `role`, `aria-*`, Escape, focus and `inert` handling.
+
+**stdf has almost no accessibility behaviour in its overlays.** `popup`, `modal`, `dialog`, `mask`, `actionPopover`, `actionSheet`, `tooltip`, `toast` and `picker` contain none of it; only `input` and `form` set aria attributes. So wherever an stdf overlay is used here it gets the missing behaviour from one shared helper, `modal` (`src/lib/components/modal.ts`): focus moves in, Tab stays inside, Escape closes (the topmost modal only), focus returns to the opener, and the rest of the page is made `inert`. stdf's dimming layer is a button laid over the page; the helper takes it out of the tab order and hides it from screen readers. stdf's `dark:` classes follow the operating system only, so `stdf.css` redefines the `dark` variant to follow the app's `data-appearance` override first, like the app's own tokens.
+
+| Built here | stdf has | Decision |
+| --- | --- | --- |
+| `Button` | `Button` | stdf (wrapped to forward aria attributes) |
+| `IconButton` | `Button` | stdf `Button` underneath; the tooltip is ours (see Tooltip) |
+| `Dialog` | `Popup` (centre) | stdf `Popup` + `modal`. stdf's own `Dialog` is a fixed two-button confirm layout and cannot hold a form or three buttons |
+| `Drawer` | `Popup` (right) | stdf `Popup` + `modal` |
+| `FeatureCard` (landing) | `Card` | stdf `Card` (a plain box, nothing to add) |
+| Tooltip in `IconButton` | `Tooltip` | ours: stdf's opens on click only; this one opens on hover after a delay and on keyboard focus, and Escape closes it |
+| `Menu`, `MoreMenu` | `ActionPopover` | ours: stdf's is a mobile action list with no menu roles and no keyboard handling; this has arrow-key navigation and `role="menu"` |
+| `Input` | `Input` | ours: stdf's has no `aria-invalid` or `aria-describedby`, no id or element reference to focus, and a `keydown` callback that passes only the key. It also puts its label and any hint inside one `<label>`, which changes the accessible name |
+| `Select` | none (`Picker` is a wheel picker for phones) | ours: a native `<select>` |
+| `NumberInput` | `Stepper` | ours: a decimal text field with exact-decimal validation; stdf's Stepper is a plus/minus control for whole numbers |
+| `TableCell` | none (stdf has no table) | ours |
+| `Icon` | `Icon` | ours: a set of line icons drawn on one grid; stdf's icons are filled, and the two styles should not be mixed |
+
 ## Source and license
 
 - **Design reference:** [`dickwu/apple-design-skill`](https://github.com/dickwu/apple-design-skill), an agent skill that reviews UI against Apple's Human Interface Guidelines (HIG).
@@ -81,7 +102,8 @@ Contrast, light / dark: body text on surface 16.8 / 12.8, secondary text 5.1 / 5
 | `Button` | `primary`, `secondary`, `destructive`; native `<button>` so Enter/Space work; disabled state; focus ring |
 | `Input` | Required `label`, `hint`, `error` (sets `aria-invalid`, announced politely), disabled |
 | `NumberInput` | Built on `Input`; `oninput`/`onchange` emit `number \| null`; `min`, `max`, `required`; validation shown after the field is touched. Plain decimal notation only (locale-aware parsing belongs to the decimal helpers) |
-| `Dialog` | Native modal `<dialog>`: focus moves in on open, Escape or backdrop click cancels, focus returns to the opener; `bind:open`, `title`, `description`, `footer` snippet. Subtle Svelte `scale`/`fade` on entry |
+| `Dialog` | stdf `Popup` (centred) plus the shared `modal` behaviour (`src/lib/components/modal.ts`): focus moves in on open, Escape or a click on the dimmed page cancels, focus returns to the opener, the page behind is locked; `bind:open`, `title`, `description`, `footer` snippet. No animation |
+| `Drawer` | stdf `Popup` (right edge) plus the same `modal` behaviour: a third of the window wide, never under 28rem; `bind:open`, `title`, `actions` snippet beside the title, close button. No animation |
 | `TableCell` | `<td>` or `<th>` (`header`); `numeric` (right-aligned tabular figures), `selected`, `invalid`, focus ring when focusable |
 
 Import with `import { Button, Dialog, Input, NumberInput, TableCell } from '#lib'`.

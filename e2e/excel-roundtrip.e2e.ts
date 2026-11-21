@@ -294,7 +294,7 @@ describe('files that must be refused, and cancelled imports', () => {
 		await shown.waitFor();
 		for (const text of expected) expect(await shown.innerText()).toContain(text);
 		await press('Close');
-		expect(page.url()).toBe(`${baseUrl}/`); // still on the main page, nothing opened
+		await page.waitForURL(`${baseUrl}/`); // still on the main page, nothing opened
 		expect(await stored()).toEqual(before); // not a byte changed
 	};
 
@@ -368,7 +368,7 @@ describe('files that must be refused, and cancelled imports', () => {
 		await press('Cancel');
 		await page.getByRole('dialog', { name: /already saved/ }).waitFor({ state: 'detached' });
 
-		expect(page.url()).toBe(`${baseUrl}/`);
+		await page.waitForURL(`${baseUrl}/`);
 		expect(await stored()).toEqual(before);
 	});
 
@@ -406,7 +406,7 @@ describe('a failure while saving leaves no partial Budget', () => {
 		await shown.waitFor();
 		expect(await shown.innerText()).toContain('Nothing was changed');
 		expect(await stored()).toEqual(before);
-		expect(page.url()).toBe(`${baseUrl}/`);
+		await page.waitForURL(`${baseUrl}/`);
 	});
 
 	it('leaves a replaced Budget exactly as it was when the replacement cannot be saved', async () => {

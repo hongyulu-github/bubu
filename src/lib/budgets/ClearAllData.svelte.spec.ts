@@ -8,6 +8,7 @@ import { CommandHistory } from '../history/commands';
 import { bubuStorage } from '../storage/bubu';
 import { BudgetStore } from '../state/budgets.svelte';
 import { BudgetPersistence } from '../state/persistence.svelte';
+import { settled } from '../testing/motion';
 import BudgetsDrawer from './BudgetsDrawer.svelte';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -26,7 +27,10 @@ const newStore = () => {
 	return store;
 };
 /** The Budgets drawer, open on the saved list, where the "⋯" menu with Clear all BuBu data lives. */
-const openDrawer = (store: BudgetStore) => render(BudgetsDrawer, { open: true, view: 'list', store, oncreated: vi.fn() });
+const openDrawer = async (store: BudgetStore) => {
+	render(BudgetsDrawer, { open: true, view: 'list', store, oncreated: vi.fn() });
+	await settled(); // it slides in: wait until it is in place, or a click can land on the dimmed page instead
+};
 
 const open = async () => {
 	await page.getByRole('button', { name: 'More actions' }).click();
@@ -44,7 +48,7 @@ afterEach(() => localStorage.clear());
 describe('Clear all BuBu data, in the Budgets drawer', () => {
 	it('is a destructive item in a "⋯" menu to the right of the "My budgets" title, beside Close', async () => {
 		seed();
-		openDrawer(newStore());
+		await openDrawer(newStore());
 		await expect.element(page.getByRole('button', { name: 'Clear all BuBu data' })).not.toBeInTheDocument(); // not a button on the page
 		const title = page.getByRole('heading', { name: 'My budgets' }).element().getBoundingClientRect();
 		const more = page.getByRole('button', { name: 'More actions' }).element().getBoundingClientRect();
@@ -59,14 +63,14 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 
 	it('has no "New budget" button in the list any more', async () => {
 		seed();
-		openDrawer(newStore());
+		await openDrawer(newStore());
 		await expect.element(page.getByRole('link', { name: /Wedding/ })).toBeVisible();
 		expect(page.getByRole('button', { name: /new budget/i }).elements()).toHaveLength(0);
 	});
 
 	it('is hidden when there are no Budgets to clear, and appears with the first one', async () => {
 		const store = newStore();
-		openDrawer(store);
+		await openDrawer(store);
 		await expect.element(page.getByText('No saved Budgets yet.')).toBeVisible();
 		await expect.element(page.getByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
 
@@ -76,7 +80,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 
 	it('asks first, in strong words: all Budgets are removed, it cannot be undone', async () => {
 		seed();
-		openDrawer(newStore());
+		await openDrawer(newStore());
 		await open();
 		const dialog = page.getByRole('dialog', { name: 'Clear all BuBu data?' });
 		await expect.element(dialog).toBeVisible();
@@ -89,7 +93,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 		seed();
 		keep();
 		const store = newStore();
-		openDrawer(store);
+		await openDrawer(store);
 		store.editItem(A, itemId(101), 'description', 'edited');
 		const before = JSON.stringify({ ...localStorage });
 		const budgets = store.budgets;
@@ -112,7 +116,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 		keep();
 		const store = newStore();
 		const stopAutosave = new BudgetPersistence(store).start(); // as the app layout does: it must not write anything back
-		openDrawer(store);
+		await openDrawer(store);
 		store.editItem(A, itemId(101), 'description', 'edited');
 
 		await open();
