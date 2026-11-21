@@ -11,6 +11,7 @@ import { BudgetStore } from '../state/budgets.svelte';
 import { createBubuStorage } from '../storage/bubu';
 import { FakeStorage } from '../testing/fake-storage';
 import { settled } from '../testing/motion';
+import { templates } from '../templates/templates';
 import Landing from './Landing.svelte';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -305,14 +306,44 @@ describe('selecting and managing Budgets in the drawer', () => {
 });
 
 describe('the template showcases', () => {
-	it('sit on the landing page and pass the chosen template id on without saving anything', async () => {
-		const fake = new FakeStorage();
-		const store = new BudgetStore({ storage: createBubuStorage(() => fake), history: new CommandHistory() });
-		store.hydrate();
-		const onusetemplate = vi.fn();
-		render(Landing, { store, navigate: vi.fn(), onusetemplate });
+	it('open the new-Budget form for the chosen template, and creating nothing happens until it is submitted', async () => {
+		const { fake, navigate } = setup({ saved: false });
 		await page.getByRole('button', { name: 'Use template: Wedding' }).click();
-		expect(onusetemplate).toHaveBeenCalledExactlyOnceWith('wedding');
-		expect(fake.data.size).toBe(0); // showing and choosing a template creates no Budget
+		await expect.element(drawer('New budget')).toBeVisible();
+		await expect.element(page.getByText('Starting from the Wedding template', { exact: false })).toBeVisible();
+		await expect.element(page.getByLabelText('Name')).toHaveValue('Wedding'); // the name is offered, and editable
+		expect(fake.data.size).toBe(0);
+		expect(navigate).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		['Wedding', 'wedding', 0],
+		['Home renovation', 'home-renovation', 1],
+		['Travel', 'travel', 2]
+	])('create the %s hierarchy in the chosen currency and open its editor', async (name, id, slide) => {
+		const { store, navigate } = setup({ saved: false });
+		for (let i = 0; i < slide; i++) await page.getByRole('button', { name: 'Next template' }).click();
+		await page.getByRole('button', { name: `Use template: ${name}` }).click();
+		await submit(`My ${name}`, 'DKK');
+		await vi.waitFor(() => expect(navigate).toHaveBeenCalledOnce());
+		const budget = store.budgets[0];
+		expect(navigate).toHaveBeenCalledWith(`/budgets/${budget.id}`);
+		expect(budget).toMatchObject({ name: `My ${name}`, currency: 'DKK' });
+		expect(store.itemsOf(budget.id).length).toBe(templates.find((t) => t.id === id)!.items.length);
+	});
+
+	it('cancelling before creating leaves nothing behind, and normal creation afterwards is still empty', async () => {
+		const { fake, store } = setup({ saved: false });
+		await page.getByRole('button', { name: 'Use template: Wedding' }).click();
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		await settled();
+		expect(fake.data.size).toBe(0);
+
+		await create().click();
+		await expect.element(page.getByLabelText('Name')).toHaveValue(''); // not the template's name
+		expect(page.getByText('Starting from the', { exact: false }).elements()).toHaveLength(0);
+		await submit('Plain', 'EUR');
+		await vi.waitFor(() => expect(store.budgets).toHaveLength(1));
+		expect(store.itemsOf(store.budgets[0].id)).toHaveLength(0);
 	});
 });
