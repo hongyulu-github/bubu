@@ -52,4 +52,10 @@ describe('Select', () => {
 		expect(contrastRatio(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
 		expect(contrastRatio(style.borderTopColor, style.backgroundColor)).toBeGreaterThanOrEqual(3);
 	});
+
+	it('lists each choice once: no second, disabled placeholder from the library beside the app\'s own', async () => {
+		render(Select, { label: 'Currency', options: [{ value: 'EUR', label: 'EUR' }], placeholder: 'Choose a currency' });
+		const options = [...document.querySelectorAll('select option')].map((option) => option.textContent);
+		expect(options).toEqual(['Choose a currency', 'EUR']);
+	});
 });

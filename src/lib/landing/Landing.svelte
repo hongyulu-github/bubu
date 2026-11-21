@@ -42,5 +42,5 @@
 {#snippet showcases()}
 	<TemplateShowcases onuse={useTemplate} />
 {/snippet}
-<LandingPage oncreate={() => show('new')} onopenbudgets={() => show('list')} {showcases} />
+<LandingPage oncreate={() => show('new')} onopenbudgets={() => show('list')} drawer={open ? view : null} {showcases} />
 <BudgetsDrawer bind:open bind:view {store} {template} oncreated={(budget) => navigate(`/budgets/${budget.id}`)} />

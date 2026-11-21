@@ -29,6 +29,7 @@
 		{id}
 		bind:value
 		disabled={disabled ?? false}
+		placeholder=""
 		color={error ? 'red' : 'default'}
 		classes={{ select: "border-gray-500 appearance-none pe-10 dark:border-gray-400" }}
 		aria-invalid={error ? 'true' : undefined}

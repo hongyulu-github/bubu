@@ -600,7 +600,7 @@ describe('Keyboard navigation and editing (built static site)', () => {
 
 	it('moves, edits, tabs, validates and cancels from the keyboard alone, and the result is saved', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
-		await page.getByRole('grid', { name: 'Budget Items' }).waitFor();
+		await page.getByRole('treegrid', { name: 'Budget Items' }).waitFor();
 		await page.locator('tr[data-code="1.1"] td[data-cell$="|code"]').click(); // land on a cell
 		expect(await where()).toBe('1.1:code:nav');
 
@@ -657,7 +657,7 @@ describe('Keyboard navigation and editing (built static site)', () => {
 
 		// Everything committed above survived: it was saved automatically.
 		await page.reload();
-		await page.getByRole('grid', { name: 'Budget Items' }).waitFor();
+		await page.getByRole('treegrid', { name: 'Budget Items' }).waitFor();
 		expect(await page.getByLabel('Description 1.1', { exact: true }).inputValue()).toBe('Banquet hall');
 		expect(await page.getByLabel('Quantity 1.1', { exact: true }).inputValue()).toBe('2.5');
 		expect(await page.getByLabel('Unit 1.1', { exact: true }).inputValue()).toBe('hall');
@@ -675,7 +675,7 @@ describe('Keyboard navigation and editing (built static site)', () => {
 
 	it('has the grid as a single stop in the Tab order', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
-		await page.getByRole('grid', { name: 'Budget Items' }).waitFor();
+		await page.getByRole('treegrid', { name: 'Budget Items' }).waitFor();
 		const stops = await page.evaluate(() => [...document.querySelectorAll('tbody td[data-cell]')].filter((td) => td.getAttribute('tabindex') === '0').length);
 		expect(stops).toBe(1);
 		const inputsInTabOrder = await page.evaluate(() => [...document.querySelectorAll('tbody input')].filter((i) => (i as HTMLInputElement).tabIndex >= 0).length);

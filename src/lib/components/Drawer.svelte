@@ -45,12 +45,12 @@
 	aria-labelledby={titleId}
 	class="w-full max-w-md"
 >
-	<header class="mb-4 flex items-center justify-between gap-3">
+	<div data-drawer-header class="mb-4 flex items-center justify-between gap-3">
 		<h2 id={titleId} tabindex="-1" data-autofocus={focusTitle ? "" : undefined} class="text-xl outline-none font-semibold text-gray-900 dark:text-white">{title}</h2>
 		<div class="flex items-center gap-1">
 			{@render actions?.()}
 			<IconButton icon="close" label="Close" onclick={close} />
 		</div>
-	</header>
+	</div>
 	{@render body?.()}
 </Drawer>

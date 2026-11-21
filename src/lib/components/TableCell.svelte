@@ -68,6 +68,7 @@
 		class={cellClass}
 		style="padding-inline-start: calc(0.75rem + min({depth} * 1rem, 12rem));{style}"
 		data-readonly={readonly ? '' : undefined}
+		aria-readonly={readonly ? 'true' : undefined}
 		aria-selected={selected && rest.tabindex !== undefined ? true : undefined}
 		aria-invalid={invalid ? 'true' : undefined}
 	>

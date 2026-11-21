@@ -71,7 +71,7 @@ describe('BudgetSpreadsheet', () => {
 
 	it('shows nested Quantity multipliers: each Group multiplies after summing its direct children', async () => {
 		render(BudgetSpreadsheet, { rows: openStore(nested()).rows, currency: 'EUR' });
-		await expect.element(page.getByRole('grid', { name: 'Budget Items' })).toBeVisible();
+		await expect.element(page.getByRole('treegrid', { name: 'Budget Items' })).toBeVisible();
 		expect(table()).toEqual([
 			['1', 'Item 1', '2', '', '67.00', '134.00'],
 			['1.1', 'Item 2', '3', '', '20.00', '60.00'],
@@ -385,7 +385,7 @@ describe('adding Items', () => {
 
 		await page.getByRole('button', { name: 'New item', exact: true }).click();
 
-		await expect.element(page.getByRole('grid', { name: 'Budget Items' })).toBeVisible();
+		await expect.element(page.getByRole('treegrid', { name: 'Budget Items' })).toBeVisible();
 		expect(codes()).toEqual(['1']);
 		expect(table()).toEqual([['1', '', '1', '', '0', '0.00']]); // empty Description, Quantity 1, Unit price 0 (an input), Total 0
 		await expect.element(page.getByLabelText('Description 1', { exact: true })).toHaveFocus();
