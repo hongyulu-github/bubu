@@ -13,7 +13,8 @@
 		expandAll: 'm7 8 5-4 5 4M7 16l5 4 5-4',
 		collapseAll: 'm7 4 5 4 5-4M7 20l5-4 5 4',
 		check: 'm5 12 5 5 9-10',
-		download: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14'
+		download: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14',
+		heart: 'M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.1a4.3 4.3 0 0 1 7.5 2.7C19.5 15.4 12 20 12 20Z'
 	} as const;
 
 	export type IconName = keyof typeof PATHS;
