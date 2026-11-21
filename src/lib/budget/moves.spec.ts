@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createItem, type Item } from './model';
-import { reorderSibling } from './moves';
+import { calculateBudget } from './calculate';
+import { reorderSibling, reparentSubtree } from './moves';
+import { toString } from './numbers';
 import { buildItemTree } from './tree';
 
 const BUDGET = '11111111-1111-4111-8111-111111111111';
@@ -117,5 +119,116 @@ describe('reorderSibling', () => {
 		expect(reorderSibling(items, uuid(99), uuid(5), 'before')).toEqual({ ok: false, reason: 'unknown-item' });
 		expect(reorderSibling(items, uuid(5), uuid(99), 'after')).toEqual({ ok: false, reason: 'unknown-item' });
 		expect(reorderSibling(items, uuid(5), uuid(2), 'before')).toEqual({ ok: false, reason: 'different-parents' });
+	});
+});
+
+describe('reparentSubtree', () => {
+	const parentsOf = (items: readonly Item[]) => Object.fromEntries(items.map((item) => [Number(item.id.slice(-12)), item.parentId && Number(item.parentId.slice(-12))]));
+	const reparent = (items: Item[], id: number, destination: number | null, position: number) => {
+		const result = reparentSubtree(items, uuid(id), destination === null ? null : uuid(destination), position);
+		if (!result.ok) throw new Error(result.reason);
+		return result;
+	};
+	const byId = (items: readonly Item[], n: number) => items.find((item) => item.id === uuid(n))!;
+	const grand = (items: readonly Item[]) => Number(toString(calculateBudget(items).grandTotal));
+
+	it('moves a nested subtree to another parent with every descendant, id and link intact', () => {
+		const items = sample(); // 3 (with child 8) goes from Group 1 to the top level, between 5 and 6
+		const { items: next, changed } = reparent(items, 3, null, 2);
+
+		expect(changed).toBe(true);
+		expect(order(next, null)).toEqual([1, 5, 3, 6, 7]);
+		expect(order(next, 1)).toEqual([2, 4]); // former siblings closed up
+		expect(order(next, 3)).toEqual([8]);
+		expect(byId(next, 8)).toBe(byId(items, 8)); // the descendant is the very same object
+		expect(parentsOf(next)).toEqual({ ...parentsOf(items), 3: null });
+	});
+
+	it('moves an Item into a Group at a chosen position, and to the top level from a Group', () => {
+		expect(order(reparent(sample(), 5, 1, 0).items, 1)).toEqual([5, 2, 3, 4]);
+		expect(order(reparent(sample(), 5, 1, 3).items, 1)).toEqual([2, 3, 4, 5]);
+		const up = reparent(sample(), 2, null, 0).items;
+		expect(order(up, null)).toEqual([2, 1, 5, 6, 7]);
+		expect(order(up, 1)).toEqual([3, 4]);
+	});
+
+	it('changes only the parent and order fields it must', () => {
+		const items = sample();
+		const { items: next } = reparent(items, 5, 1, 1); // 5 is a Line; Group 1 stays a Group at 0
+		const changed = next.filter((item, index) => item !== items[index]).map((item) => Number(item.id.slice(-12)));
+		expect(changed.sort()).toEqual([3, 4, 5, 6, 7].sort()); // 5 moved; 3, 4 shifted; 6, 7 closed the gap
+		for (const [index, item] of next.entries()) {
+			const { sortIndex: _a, parentId: _b, ...kept } = item;
+			const { sortIndex: _c, parentId: _d, ...original } = items[index];
+			expect(kept).toEqual(original);
+		}
+	});
+
+	it('turns a former parent that loses its last child into a Line at 0, keeping Description, Quantity and Unit', () => {
+		const items = [
+			make(1, null, 0, { description: 'Venue', quantity: '3', unit: 'days', unitPrice: '0' }),
+			make(2, 1, 0, { unitPrice: '-40', quantity: '2' }),
+			make(3, null, 1, { unitPrice: '10', quantity: '1' })
+		];
+		expect(grand(items)).toBe(-230); // -80 x 3 + 10
+		const { items: next } = reparent(items, 2, null, 1);
+
+		expect(buildItemTree(next).nodes.get(uuid(1))!.kind).toBe('line');
+		expect(byId(next, 1)).toMatchObject({ description: 'Venue', quantity: '3', unit: 'days', unitPrice: '0' });
+		expect(grand(next)).toBe(-70); // Venue 0 x 3, then -40 x 2 and 10
+	});
+
+	it('resets a stored non-zero price on a former parent, whose old total was negative', () => {
+		const items = [make(1, null, 0, { unitPrice: '999', quantity: '2' }), make(2, 1, 0, { unitPrice: '-50', quantity: '1' })];
+		const { items: next } = reparent(items, 2, null, 0);
+		expect(byId(next, 1).unitPrice).toBe('0');
+		expect(byId(next, 1).quantity).toBe('2');
+		expect(grand(items)).toBe(-100);
+		expect(grand(next)).toBe(-50);
+	});
+
+	it('converts a destination Line to a Group at 0 and keeps its Quantity', () => {
+		const items = [make(1, null, 0, { unitPrice: '100', quantity: '4' }), make(2, null, 1, { unitPrice: '5', quantity: '1' })];
+		const { items: next } = reparent(items, 2, 1, 0);
+
+		expect(buildItemTree(next).nodes.get(uuid(1))!.kind).toBe('group');
+		expect(byId(next, 1)).toMatchObject({ unitPrice: '0', quantity: '4' });
+		expect(grand(next)).toBe(20); // 5 x 4
+	});
+
+	it('keeps a moved Group non-default Quantity and its children', () => {
+		const items = [make(1, null, 0, { unitPrice: '0', quantity: '3' }), make(2, 1, 0, { unitPrice: '7', quantity: '1' }), make(3, null, 1, { unitPrice: '1', quantity: '1' })];
+		const { items: next } = reparent(items, 1, 3, 0);
+		expect(byId(next, 1)).toMatchObject({ quantity: '3', parentId: uuid(3) });
+		expect(byId(next, 2)).toBe(byId(items, 2));
+		expect(grand(next)).toBe(21); // 7 x 3, inside Item 3 at quantity 1
+	});
+
+	it('reorders within the same parent with no normalization, and treats the same slot as unchanged', () => {
+		const items = sample();
+		expect(order(reparent(items, 4, 1, 0).items, 1)).toEqual([4, 2, 3]);
+		const same = reparent(items, 6, null, 2);
+		expect(same.changed).toBe(false);
+		expect(same.items).toBe(items);
+	});
+
+	it('does not mutate its input and keeps Group and Line derived, never stored', () => {
+		const items = sample();
+		const snapshot = structuredClone(items);
+		items.forEach(Object.freeze);
+		Object.freeze(items);
+		const { items: next } = reparent(items, 3, 5, 0);
+		expect(items).toEqual(snapshot);
+		expect(next.every((item) => !('kind' in item) && !('isGroup' in item))).toBe(true);
+	});
+
+	it('rejects unknown Items and destinations, bad positions, and moves into its own subtree', () => {
+		const items = sample();
+		expect(reparentSubtree(items, uuid(99), null, 0)).toEqual({ ok: false, reason: 'unknown-item' });
+		expect(reparentSubtree(items, uuid(5), uuid(99), 0)).toEqual({ ok: false, reason: 'unknown-destination' });
+		expect(reparentSubtree(items, uuid(5), null, 9)).toEqual({ ok: false, reason: 'invalid-position' });
+		expect(reparentSubtree(items, uuid(5), null, -1)).toEqual({ ok: false, reason: 'invalid-position' });
+		expect(reparentSubtree(items, uuid(1), uuid(8), 0)).toEqual({ ok: false, reason: 'into-own-subtree' });
+		expect(reparentSubtree(items, uuid(1), uuid(1), 0)).toEqual({ ok: false, reason: 'into-own-subtree' });
 	});
 });
