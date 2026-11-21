@@ -75,7 +75,7 @@ describe('Download as Excel', () => {
 
 		await expect.poll(() => download.blobs.length).toBe(1);
 		const sheet = (await readWorkbook(await download.blobs[0].arrayBuffer())).getWorksheet('Budget')!;
-		expect(sheet.getCell('E3').value).toBe(7.25);
+		expect(sheet.getCell('E4').value).toBe(7.25);
 	});
 
 	it('changes no Items and records no history', async () => {

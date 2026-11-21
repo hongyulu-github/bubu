@@ -8,7 +8,10 @@ import { isUuid, validateBudget } from '../budget/validation';
  * The BuBu workbook contract (LUL-63) and its hidden metadata.
  *
  * Visible sheet "Budget": row 1 is the header (Code, Description, Quantity, Unit, Unit price, Total) and
- * the Items follow from row 2 in display order. The six columns are all there is to see.
+ * the Items follow in display order. An export puts a Grand total row (no Code, the label "Grand total")
+ * right under the header, so its Items start at row 3; a sheet without one starts them at row 2. The
+ * metadata records the row of every Item, and the decoder skips the Grand total row. The six columns are
+ * all there is to see.
  *
  * Hidden sheet "BuBu metadata" holds what those columns cannot: the format version, the Budget document,
  * and for every Item its UUID, its visible row and Code, its parent and its exact Quantity and Unit
@@ -20,6 +23,8 @@ import { isUuid, validateBudget } from '../budget/validation';
 export const METADATA_VERSION = 1;
 export const BUDGET_SHEET = 'Budget';
 export const METADATA_SHEET = 'BuBu metadata';
+/** The label of the exporter's Grand total row, which sits under the header and is not an Item. */
+export const GRAND_TOTAL_LABEL = 'Grand total';
 export const VISIBLE_COLUMNS = ['Code', 'Description', 'Quantity', 'Unit', 'Unit price', 'Total'] as const;
 
 const BUDGET_KEYS = ['budgetId', 'name', 'currency', 'createdAt', 'updatedAt'] as const;
@@ -90,10 +95,10 @@ export function ensureBudgetSheet(workbook: Workbook): Worksheet {
 
 /**
  * Write the hidden metadata sheet (replacing any earlier one) for a Budget and its Items. Items are
- * recorded at the rows the contract gives them: depth-first display order from row 2. Everything is
+ * recorded at the rows the sheet gives them: depth-first display order from `firstItemRow` (2, or 3 under a Grand total row). Everything is
  * stored as text, so decimals keep every digit through the file. The visible sheet is not touched.
  */
-export function encodeMetadata(workbook: Workbook, budget: Budget, items: readonly Item[]): void {
+export function encodeMetadata(workbook: Workbook, budget: Budget, items: readonly Item[], firstItemRow = 2): void {
 	const existing = workbook.getWorksheet(METADATA_SHEET);
 	if (existing) workbook.removeWorksheet(existing.id);
 	const sheet = workbook.addWorksheet(METADATA_SHEET, { state: 'hidden' });
@@ -104,7 +109,7 @@ export function encodeMetadata(workbook: Workbook, budget: Budget, items: readon
 	sheet.addRow([...ITEM_COLUMNS]);
 	buildItemTree(items).ordered.forEach((node, index) => {
 		const { item } = node;
-		sheet.addRow([String(index + 2), node.code, item.id, item.parentId ?? '', item.quantity, item.unitPrice]);
+		sheet.addRow([String(index + firstItemRow), node.code, item.id, item.parentId ?? '', item.quantity, item.unitPrice]);
 	});
 }
 
@@ -241,6 +246,7 @@ export function decodeBudgetWorkbook(workbook: Workbook): DecodeResult {
 	for (let r = 2; r <= sheet.rowCount; r++) {
 		const code = cellText(sheet, r, 1);
 		if (VISIBLE_COLUMNS.every((_, c) => cellText(sheet, r, c + 1) === '')) continue;
+		if (code === '' && cellText(sheet, r, 2) === GRAND_TOTAL_LABEL) continue; // the exporter's total, not an Item
 		if (code === '') issues.push(issue('invalid-value', 'This row has no Code.', r));
 		else visible.push({ row: r, code });
 	}

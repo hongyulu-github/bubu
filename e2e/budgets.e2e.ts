@@ -231,6 +231,7 @@ describe('Building a Budget from nothing (built static site)', () => {
 
 	it('adds top-level and sibling Items, edits them, and undoes the insertion', async () => {
 		await page.goto(`${baseUrl}/budgets/new`);
+		await page.waitForLoadState('networkidle'); // hydrated: a submit before that would reload the page as a plain form
 		await page.getByLabel('Name').fill('From scratch');
 		await page.getByLabel('Currency').selectOption('EUR');
 		await page.getByRole('button', { name: 'Create Budget' }).click();
