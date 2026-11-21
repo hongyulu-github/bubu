@@ -5,6 +5,7 @@ import '../styles/tokens.css';
 import '../styles/base.css';
 import { createBudget, createItem, type Item } from '../budget/model';
 import { CommandHistory } from '../history/commands';
+import { contrastRatio, effectiveBackground, resetTheme, setTheme, type Theme } from '../testing/theme';
 import { bubuStorage, budgetKey, createBubuStorage } from '../storage/bubu';
 import { BudgetStore } from '../state/budgets.svelte';
 import { BudgetPersistence } from '../state/persistence.svelte';
@@ -439,5 +440,30 @@ describe('BudgetEditorPage', () => {
 		render(BudgetEditorPage, { budgetId: B, store: newStore() });
 		await expect.element(page.getByRole('heading', { name: 'Renovation' })).toBeVisible();
 		await expect.poll(outline).toContain('2 Flooring');
+	});
+});
+
+describe('BudgetsList empty state', () => {
+	it.each<Theme>(['light', 'dark'])('says there is nothing yet and offers to create a Budget, readable in %s', async (theme) => {
+		setTheme(theme);
+		const oncreate = vi.fn();
+		render(BudgetsList, { store: newStore(), oncreate });
+		await expect.element(page.getByRole('heading', { name: 'No saved Budgets yet.' })).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Create your first Budget' })).toBeVisible();
+		for (const element of [page.getByRole('heading', { name: 'No saved Budgets yet.' }).element(), page.getByText('A Budget is a tree of Items', { exact: false }).element()]) {
+			expect(contrastRatio(getComputedStyle(element).color, effectiveBackground(element)), theme).toBeGreaterThanOrEqual(4.5);
+		}
+		await page.getByRole('button', { name: 'Create your first Budget' }).click();
+		expect(oncreate).toHaveBeenCalledOnce();
+		resetTheme();
+	});
+
+	it('creates nothing by being shown, and offers no action when it has no way to start one', async () => {
+		const store = newStore();
+		render(BudgetsList, { store });
+		await expect.element(page.getByRole('heading', { name: 'No saved Budgets yet.' })).toBeVisible();
+		expect(page.getByRole('button', { name: /create/i }).elements()).toHaveLength(0);
+		expect(store.budgets).toEqual([]);
+		expect(localStorage.length).toBe(0);
 	});
 });
