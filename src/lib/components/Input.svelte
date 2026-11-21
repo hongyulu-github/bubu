@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { HTMLInputAttributes } from 'svelte/elements';
+	import { Helper, Input as FlowbiteInput, Label } from 'flowbite-svelte';
 
-	interface Props extends Omit<HTMLInputAttributes, 'value' | 'id'> {
+	interface Props extends Omit<HTMLInputAttributes, 'value' | 'id' | 'class'> {
 		/** Visible label; always rendered so the field has an accessible name. */
 		label: string;
 		value?: string;
@@ -23,115 +24,22 @@
 	const messageId = `${id}-message`;
 </script>
 
-<div class="field" class:compact>
-	<label for={id} class:visually-hidden={hideLabel}>{label}</label>
-	<input
+<!-- Flowbite's Label, Input and Helper are the field: a real <label for>, a native <input> that carries aria-invalid and aria-describedby, and the hint and the always-present polite message below. -->
+<div class="flex flex-col gap-1">
+	<Label for={id} class={hideLabel ? 'sr-only' : ''}>{label}</Label>
+	<FlowbiteInput
 		{id}
 		bind:value
-		class:numeric
 		{disabled}
+		size={compact ? 'sm' : 'md'}
+		color={error ? 'red' : 'default'}
 		aria-invalid={error ? 'true' : undefined}
 		aria-describedby={[hint ? hintId : '', messageId].filter(Boolean).join(' ')}
-		{...rest}
+		class={[compact ? 'border-transparent bg-transparent hover:border-gray-500 dark:hover:border-gray-400' : 'border-gray-500 dark:border-gray-400', numeric && 'text-end tabular-nums']}
+		{...rest as Record<string, unknown>}
 	/>
 	{#if hint}
-		<p class="hint" id={hintId}>{hint}</p>
+		<Helper id={hintId}>{hint}</Helper>
 	{/if}
-	<p class="error" id={messageId} aria-live="polite">{error ?? ''}</p>
+	<Helper id={messageId} color="red" aria-live="polite" class="empty:hidden">{error ?? ''}</Helper>
 </div>
-
-<style>
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-
-	label {
-		font-size: var(--font-size-callout);
-		font-weight: var(--font-weight-semibold);
-		color: var(--color-text);
-	}
-
-	input {
-		min-height: var(--control-height);
-		padding: 0 var(--space-3);
-		border: 1px solid var(--color-border-strong);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		color: var(--color-text);
-		font: inherit;
-	}
-
-	input:focus-visible {
-		outline: var(--focus-ring-width) solid var(--color-focus-ring);
-		outline-offset: var(--focus-ring-offset);
-	}
-
-	input[aria-invalid='true'] {
-		border-color: var(--color-danger);
-	}
-
-	input:disabled {
-		background: var(--color-disabled-bg);
-		color: var(--color-disabled-text);
-		border-color: transparent;
-		cursor: not-allowed;
-	}
-
-	.visually-hidden {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		margin: -1px;
-		padding: 0;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
-	}
-
-	input.numeric {
-		text-align: end;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.compact,
-	.compact input {
-		width: 100%;
-		min-width: 0;
-	}
-
-	.compact input {
-		min-height: var(--icon-button-size);
-		padding: 0 var(--space-2);
-		border-color: transparent;
-		border-radius: var(--radius-sm);
-		background: transparent;
-	}
-
-	.compact input:hover:not(:disabled) {
-		border-color: var(--color-border-strong);
-	}
-
-	.compact input[aria-invalid='true'] {
-		border-color: var(--color-danger);
-	}
-
-	.hint,
-	.error {
-		margin: 0;
-		font-size: var(--font-size-footnote);
-	}
-
-	.hint {
-		color: var(--color-text-secondary);
-	}
-
-	.error {
-		color: var(--color-danger);
-	}
-
-	.error:empty {
-		display: none;
-	}
-</style>

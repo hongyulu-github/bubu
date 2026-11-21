@@ -476,7 +476,7 @@ describe('deleting Items', () => {
 	it('deletes a Line straight away (no confirmation), with Codes and totals refreshed', async () => {
 		editor(nested());
 		await page.getByRole('button', { name: 'Delete 1.2', exact: true }).click(); // the 7 Line
-		expect(document.querySelector('[role="dialog"]')).toBeNull();
+		expect(document.querySelector('dialog[open]')).toBeNull();
 		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2']);
 		await expect.element(grandTotal()).toHaveTextContent('€120.00');
 	});
@@ -489,7 +489,7 @@ describe('deleting Items', () => {
 		await expect.element(dialog('Delete “Item 2”?')).toHaveAccessibleDescription(
 			'This removes the group and 2 items inside it. You can undo this.'
 		);
-		const listed = [...document.querySelectorAll('[role="dialog"] ul.impact li')].map((li) => li.textContent?.trim());
+		const listed = [...document.querySelectorAll('dialog ul.impact li')].map((li) => li.textContent?.trim());
 		expect(listed).toEqual(['Item 3', 'Item 4']);
 		expect(rowIds()).toHaveLength(5); // nothing deleted yet
 	});
@@ -551,7 +551,7 @@ describe('deleting Items', () => {
 	it('does not show that warning when the parent keeps other children', async () => {
 		editor(nested());
 		await page.getByRole('button', { name: 'Delete 1.1', exact: true }).click(); // Outer also has 1.2
-		expect(document.querySelector('[role="dialog"] .note')).toBeNull();
+		expect(document.querySelector('dialog .note')).toBeNull();
 	});
 
 	it('undo restores all UUIDs, hierarchy, order and parent pricing; redo removes the same subtree as one command', async () => {
@@ -597,7 +597,7 @@ describe('deleting Items', () => {
 		await expect.element(dialog('Delete “Item 1”?')).toHaveAccessibleDescription(
 			'This removes the group and 8 items inside it. You can undo this.'
 		);
-		const listed = [...document.querySelectorAll('[role="dialog"] ul.impact li')].map((li) => li.textContent?.trim());
+		const listed = [...document.querySelectorAll('dialog ul.impact li')].map((li) => li.textContent?.trim());
 		expect(listed).toEqual(['Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'and 3 more']);
 	});
 
@@ -666,7 +666,7 @@ describe('adding children', () => {
 	it('adds a child to an existing Group straight away', async () => {
 		editor(nested());
 		await addChild('1.1').click(); // an existing Group
-		expect(document.querySelector('[role="dialog"]')).toBeNull();
+		expect(document.querySelector('dialog[open]')).toBeNull();
 		expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.1.3', '1.2']);
 		await expect.element(page.getByLabelText('Description 1.1.3', { exact: true })).toHaveFocus();
 		await expect.element(grandTotal()).toHaveTextContent('€134.00');

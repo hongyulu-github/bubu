@@ -339,10 +339,11 @@ describe('Duplicating a Budget (built static site)', () => {
 		await page.goto(`${baseUrl}/budgets`);
 		await chooseBudgetAction(page, 'Duplicate', 'Wedding');
 		await page.getByRole('link', { name: /Wedding \(copy\)/ }).waitFor();
-		expect(await page.locator('[role="dialog"] ul li').count()).toBe(3);
+		expect(await page.locator('dialog ul li').count()).toBe(3);
 
 		await page.getByRole('link', { name: /Wedding \(copy\)/ }).click();
 		await page.getByRole('heading', { name: 'Wedding (copy)' }).waitFor();
+		await page.locator('dialog[open]').waitFor({ state: 'detached' }); // the drawer fades out; until then the page is locked
 		expect(await items()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
 		const copyUrl = page.url();
 
@@ -405,11 +406,11 @@ describe('Deleting a Budget (built static site)', () => {
 		await page.getByRole('dialog', { name: 'Delete “Wedding”?' }).waitFor();
 		expect(await page.getByRole('dialog', { name: 'Delete “Wedding”?' }).innerText()).toContain('3 items');
 		await page.getByRole('button', { name: 'Cancel' }).click();
-		expect(await page.locator('[role="dialog"] ul li').count()).toBe(2); // cancel changed nothing
+		expect(await page.locator('dialog ul li').count()).toBe(2); // cancel changed nothing
 
 		await chooseBudgetAction(page, 'Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
-		await expect.poll(() => page.locator('[role="dialog"] ul li').count()).toBe(1);
+		await expect.poll(() => page.locator('dialog ul li').count()).toBe(1);
 		expect(await page.getByRole('link', { name: /Renovation/ }).count()).toBe(1);
 		expect(await page.getByRole('link', { name: /Wedding/ }).count()).toBe(0);
 
@@ -470,7 +471,7 @@ describe('Everything is saved automatically (built static site)', () => {
 		await page.reload();
 		await reopenBudgets();
 		await page.getByRole('link', { name: /Renamed \(copy\)/ }).waitFor();
-		expect(await page.locator('[role="dialog"] ul li').count()).toBe(3);
+		expect(await page.locator('dialog ul li').count()).toBe(3);
 		await page.getByRole('link', { name: /^Renamed EUR/ }).click();
 		await page.getByRole('heading', { name: 'Renamed', exact: true }).waitFor();
 		expect(await editorItems()).toEqual(['1 Venue', '1.1 Hall rental', '2 Changed']);
@@ -480,12 +481,12 @@ describe('Everything is saved automatically (built static site)', () => {
 		await page.goto(`${baseUrl}/budgets`);
 		await chooseBudgetAction(page, 'Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
-		await expect.poll(() => page.locator('[role="dialog"] ul li').count()).toBe(1);
+		await expect.poll(() => page.locator('dialog ul li').count()).toBe(1);
 
 		await page.reload();
 		await reopenBudgets();
 		await page.getByRole('link', { name: /Renovation/ }).waitFor();
-		expect(await page.locator('[role="dialog"] ul li').count()).toBe(1);
+		expect(await page.locator('dialog ul li').count()).toBe(1);
 		expect(await page.getByRole('link', { name: /Wedding/ }).count()).toBe(0);
 		await page.goto(`${baseUrl}/budgets/${A}`);
 		await page.getByRole('heading', { name: 'Budget not found' }).waitFor();
@@ -744,6 +745,7 @@ describe('Undo and redo shortcuts (built static site)', () => {
 		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
 		await expect.poll(() => page.locator('tbody tr').count()).toBe(1);
+		await page.locator('dialog[open]').waitFor({ state: 'detached' }); // keys are ignored while the dialog fades out
 		await page.keyboard.press('Meta+z');
 		await expect.poll(() => page.locator('tbody tr').count()).toBe(3);
 		expect(await field('Description 1.1').inputValue()).toBe('Hall rental');

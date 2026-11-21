@@ -40,9 +40,8 @@
 		if (!budget) return;
 		const result = store.deleteBudget(budget.id);
 		message = result.ok ? `Deleted “${budget.name}”.` : `“${budget.name}” could not be deleted.`;
-		// The deleted row (and the button that opened the dialog) is gone; land on a stable control.
-		await tick();
-		document.querySelector<HTMLElement>('[data-budgets-list]')?.focus();
+		// The deleted row (and the button that opened the dialog) is gone: when the dialog has closed, focus lands on the
+		// list (`data-focus-fallback`).
 	}
 
 	/** Copy a Budget, then move focus to the copy so keyboard users land on what was made. */
@@ -101,7 +100,7 @@
 </script>
 
 <!-- Focus lands here after a Budget is deleted: the row and the menu that opened its dialog are gone. -->
-<div class="list" tabindex="-1" data-budgets-list>
+<div class="list" tabindex="-1" data-budgets-list data-focus-fallback>
 	{#if store.hydrationStatus === 'idle'}
 		<p class="note" role="status">Loading your Budgets…</p>
 	{:else if store.hydrationStatus === 'unavailable'}

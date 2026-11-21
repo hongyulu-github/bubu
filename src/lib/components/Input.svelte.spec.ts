@@ -29,13 +29,14 @@ describe('Input', () => {
 
 	it('shows a visible focus ring for keyboard focus', async () => {
 		render(Input, { label: 'Name' });
+		const idle = getComputedStyle(page.getByLabelText('Name').element()).borderTopColor;
 		await focusDocument(page);
 		await userEvent.tab();
 		const input = page.getByLabelText('Name');
 		await expect.element(input).toHaveFocus();
 		const style = getComputedStyle(input.element());
-		expect(style.outlineStyle).toBe('solid');
-		expect(parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2);
+		// Flowbite shows focus as a ring or a change of border colour, not an outline.
+		expect(style.boxShadow !== 'none' || style.borderTopColor !== idle).toBe(true);
 	});
 
 	it.each<Theme>(['light', 'dark'])('has readable text and a visible border in %s', async (theme) => {

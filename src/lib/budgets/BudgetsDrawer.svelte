@@ -23,7 +23,7 @@
 	let announcement = $state('');
 </script>
 
-<Drawer bind:open title={view === 'list' ? 'My budgets' : 'New budget'}>
+<Drawer bind:open title={view === 'list' ? 'My budgets' : 'New budget'} focusTitle={view === 'list'}>
 	{#snippet actions()}
 		{#if view === 'list'}<ClearAllData {store} onmessage={(text) => (announcement = text)} />{/if}
 	{/snippet}

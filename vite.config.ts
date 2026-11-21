@@ -8,7 +8,7 @@ export default defineConfig({
 	ssr: {
 		// Atlaskit's Pragmatic packages expose subpaths as directories (no `exports` map), which Node's
 		// ESM loader cannot resolve while prerendering. Let Vite bundle them for SSR instead.
-		noExternal: ['@atlaskit/pragmatic-drag-and-drop', '@atlaskit/pragmatic-drag-and-drop-hitbox', 'stdf', '@any-tdf/common']
+		noExternal: ['@atlaskit/pragmatic-drag-and-drop', '@atlaskit/pragmatic-drag-and-drop-hitbox']
 	},
 	plugins: [
 		tailwindcss(),

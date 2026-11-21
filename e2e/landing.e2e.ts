@@ -94,6 +94,7 @@ describe('the landing page (built static site)', () => {
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
 		await drawer('My budgets').waitFor({ state: 'detached' });
 		await mine().click();
+		await drawer('My budgets').waitFor(); // Escape before it has opened would do nothing
 		await page.keyboard.press('Escape');
 		await drawer('My budgets').waitFor({ state: 'detached' });
 
