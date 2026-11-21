@@ -402,7 +402,7 @@ describe('a failure while saving leaves no partial Budget', () => {
 		await failBudgetWrites();
 		await page.locator('input[type="file"]').setInputFiles({ name: 'budget.xlsx', mimeType: XLSX, buffer: file });
 
-		const shown = page.getByRole('dialog', { name: 'The Budget could not be imported' });
+		const shown = page.getByRole('dialog', { name: 'Excel import failed' });
 		await shown.waitFor();
 		expect(await shown.innerText()).toContain('Nothing was changed');
 		expect(await stored()).toEqual(before);
@@ -420,7 +420,7 @@ describe('a failure while saving leaves no partial Budget', () => {
 		await press('Replace…');
 		await press('Replace Budget');
 
-		await page.getByRole('dialog', { name: 'The Budget could not be imported' }).waitFor();
+		await page.getByRole('dialog', { name: 'Excel import failed' }).waitFor();
 		expect(await stored()).toEqual(before);
 	});
 });

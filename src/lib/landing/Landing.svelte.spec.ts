@@ -340,6 +340,8 @@ describe('the template showcases', () => {
 		expect(fake.data.size).toBe(0);
 
 		await create().click();
+		await expect.element(drawer('New budget')).toBeVisible();
+		await settled();
 		await expect.element(page.getByLabelText('Name')).toHaveValue(''); // not the template's name
 		expect(page.getByText('Starting from the', { exact: false }).elements()).toHaveLength(0);
 		await submit('Plain', 'EUR');

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import StatusMessage from '../components/StatusMessage.svelte';
+	import { describeUnreadable } from '../errors/messages';
 	import { tick } from 'svelte';
 	import { calculateBudget } from '../budget/calculate';
 	import { formatMoney } from '../budget/currency';
@@ -104,7 +106,7 @@
 	{#if store.hydrationStatus === 'idle'}
 		<p class="note" role="status">Loading your Budgets…</p>
 	{:else if store.hydrationStatus === 'unavailable'}
-		<p class="note" role="alert">Browser storage is not available, so saved Budgets cannot be shown.</p>
+		<StatusMessage title="Saved Budgets cannot be shown">Browser storage is not available, so nothing is saved on this device.</StatusMessage>
 	{:else}
 		<p class="visually-hidden" role="status">{message || announcement}</p>
 		<ConfirmDeleteBudgetDialog
@@ -115,10 +117,7 @@
 		/>
 
 		{#if unreadable.length > 0}
-			<p class="note warning" role="alert">
-				{unreadable.length === 1 ? '1 saved Budget' : `${unreadable.length} saved Budgets`} could not be loaded
-				and {unreadable.length === 1 ? 'was' : 'were'} left untouched.
-			</p>
+			<StatusMessage kind="warning" title="Some Budgets could not be loaded">{describeUnreadable(unreadable.length)}</StatusMessage>
 		{/if}
 
 		{#if budgets.length === 0}
@@ -295,9 +294,5 @@
 	.note {
 		margin: 0;
 		color: var(--color-text-secondary);
-	}
-
-	.warning {
-		color: var(--color-danger);
 	}
 </style>

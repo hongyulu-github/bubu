@@ -5,6 +5,7 @@
 	import favicon from '#lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
 	import { budgetPersistence, budgetStore } from '#lib';
+	import SaveStatus from '#lib/budgets/SaveStatus.svelte';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -22,42 +23,6 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{#if budgetPersistence.failures.length > 0}
-	<!-- Minimal on purpose: the shared error presentation (LUL-30) will replace this. -->
-	<div class="save-error" role="alert">
-		<span>Your changes are not being saved: {budgetPersistence.failures[0].error.message}</span>
-		<button type="button" onclick={() => budgetPersistence.flush()}>Try again</button>
-	</div>
-{/if}
+<SaveStatus />
 
 {@render children()}
-
-<style>
-	.save-error {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: center;
-		gap: var(--space-3);
-		padding: var(--space-3) var(--space-4);
-		background: var(--color-danger);
-		color: var(--color-on-danger);
-		font-size: var(--font-size-callout);
-	}
-
-	.save-error button {
-		min-height: 2.25rem;
-		padding: 0 var(--space-3);
-		border: 1px solid currentColor;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		color: inherit;
-		font: inherit;
-		cursor: pointer;
-	}
-
-	.save-error button:focus-visible {
-		outline: var(--focus-ring-width) solid currentColor;
-		outline-offset: var(--focus-ring-offset);
-	}
-</style>

@@ -11,6 +11,8 @@
 	import type { ConversionImpact } from '../budget/convert';
 	import { exportBudget, exportFilename } from '../excel/export-budget';
 	import { saveBlob } from '../excel/template';
+	import StatusMessage from '../components/StatusMessage.svelte';
+	import { EXCEL_FAILURES } from '../errors/messages';
 	import { commitMove } from '../editor/move';
 	import type { DropRequest } from '../editor/drag';
 	import ConfirmDeleteDialog from './ConfirmDeleteDialog.svelte';
@@ -221,7 +223,7 @@
 				</div>
 			</div>
 			{#if exportFailed}
-				<p class="note" role="alert">The Excel file could not be created. Please try again.</p>
+				<StatusMessage title={EXCEL_FAILURES.export.title}>{EXCEL_FAILURES.export.detail}</StatusMessage>
 			{/if}
 
 			<div class="table-area">

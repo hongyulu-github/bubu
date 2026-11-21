@@ -4,6 +4,7 @@
 	import { validateBudgetForm } from '../budget/create';
 	import { buildImport, describeLocation, needsFor, stageWorkbook, type Staged } from '../excel/import-flow';
 	import type { ValidationError } from '../excel/validate';
+	import { describeImportFailure, describeProblemCount, EXCEL_FAILURES } from '../errors/messages';
 	import Button from '../components/Button.svelte';
 	import Dialog from '../components/Dialog.svelte';
 	import Input from '../components/Input.svelte';
@@ -24,7 +25,7 @@
 		| { kind: 'details' }
 		| { kind: 'conflict'; existing: Budget }
 		| { kind: 'confirm-replace'; existing: Budget }
-		| { kind: 'failed'; message: string };
+		| { kind: 'failed'; title: string; detail: string };
 
 	const SHOWN_ERRORS = 20;
 
@@ -63,7 +64,7 @@
 		try {
 			data = await file.arrayBuffer();
 		} catch {
-			show({ kind: 'failed', message: 'The file could not be read.' });
+			show({ kind: 'failed', ...EXCEL_FAILURES.read });
 			return;
 		}
 		const result = await stageWorkbook(data);
@@ -81,20 +82,12 @@
 	function commit(options: { details?: { name: string; currency: string }; mode?: 'replace' | 'copy' }) {
 		const built = staged ? buildImport(staged, options) : null;
 		if (!built?.ok) {
-			show({ kind: 'failed', message: 'This workbook could not be turned into a valid Budget.' });
+			show({ kind: 'failed', ...EXCEL_FAILURES.build });
 			return;
 		}
 		const saved = store.importBudget(built.budget, built.items, { replace: options.mode === 'replace' });
 		if (!saved.ok) {
-			show({
-				kind: 'failed',
-				message:
-					saved.reason === 'storage'
-						? 'Your browser could not save the Budget, for example because its storage is full. Nothing was changed.'
-						: saved.reason === 'exists'
-							? 'A Budget with the same identity is already saved. Nothing was changed.'
-							: 'This workbook could not be turned into a valid Budget.'
-			});
+			show({ kind: 'failed', ...describeImportFailure(saved) });
 			return;
 		}
 		reset();
@@ -116,11 +109,13 @@
 					? `“${step.existing.name}” is already saved`
 					: step?.kind === 'confirm-replace'
 						? `Replace “${step.existing.name}”?`
-						: 'The Budget could not be imported'
+						: step?.kind === 'failed'
+							? step.title
+							: 'The Budget could not be imported'
 	);
 	const description = $derived(
 		step?.kind === 'errors'
-			? 'Nothing was changed. Fix these in Excel and import the file again.'
+			? `${describeProblemCount(step.errors.length)}. Nothing was changed. Fix these in Excel and import the file again.`
 			: step?.kind === 'details'
 				? 'This workbook has no BuBu details, so it will be imported as a new Budget.'
 				: step?.kind === 'conflict'
@@ -128,7 +123,7 @@
 					: step?.kind === 'confirm-replace'
 						? 'This permanently replaces the saved Budget and all its items with the ones in the workbook. Undo cannot bring them back.'
 						: step?.kind === 'failed'
-							? step.message
+							? step.detail
 							: undefined
 	);
 </script>
