@@ -77,6 +77,19 @@
 	});
 	$effect(() => (onmove ? monitorRowDrops(onmove) : undefined));
 
+	// For dragging: each row's ancestors, and whether it is the last visible row of its parent. Only
+	// descendants can be hidden, so a row's ancestors are always among `rows`.
+	const dragInfo = $derived.by(() => {
+		const info = new Map<string, { ancestors: string[]; lastInGroup: boolean }>();
+		const path: string[] = [];
+		rows.forEach((row, index) => {
+			path.length = row.depth;
+			info.set(row.id, { ancestors: [...path], lastInGroup: row.depth > 0 && (rows[index + 1]?.depth ?? 0) < row.depth });
+			path[row.depth] = row.id;
+		});
+		return info;
+	});
+
 	let active = $state.raw<(Cell & { index: number }) | null>(null);
 
 	/** Attributes that make a data cell a focusable grid cell with a roving tab stop. */
@@ -233,7 +246,12 @@
 					data-section={group || row.depth > 0 ? '' : undefined}
 					style:--row-tint={group ? `var(--tint-depth-${Math.min(row.depth, 2)})` : undefined}
 					{@attach onmove
-						? rowDrag({ id: row.id, depth: row.depth, expanded: group && !collapsed.has(row.id) })
+						? rowDrag({
+								id: row.id,
+								depth: row.depth,
+								expanded: group && !collapsed.has(row.id),
+								...dragInfo.get(row.id)!
+							})
 						: undefined}
 				>
 					<TableCell readonly depth={row.depth} {...{ [DRAG_HANDLE]: '' }} {...cell(row, 'code')}>

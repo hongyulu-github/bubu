@@ -7,6 +7,10 @@
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import IconButton from '../components/IconButton.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
+	import ConfirmConversionDialog from './ConfirmConversionDialog.svelte';
+	import type { ConversionImpact } from '../budget/convert';
+	import { commitMove } from '../editor/move';
+	import type { DropRequest } from '../editor/drag';
 	import ConfirmDeleteDialog from './ConfirmDeleteDialog.svelte';
 	import InlineTitle from './InlineTitle.svelte';
 
@@ -98,8 +102,33 @@
 		if (added.ok) await focusDescription(added.item.id);
 	}
 
-	/** Rows can be dragged, but no move handler exists yet (LUL-14): a drop is reported and ignored. */
-	function ignoreMove() {}
+	// A drop into a Line asks first. `askConversion` shows the dialog and resolves with the answer; any
+	// way of closing it that is not "Convert and move item" (Cancel, Escape) answers no.
+	let confirmingConversion = $state(false);
+	let pendingConversion = $state<ConversionImpact | null>(null);
+	let answerConversion: ((confirmed: boolean) => void) | null = null;
+
+	function askConversion(impact: ConversionImpact): Promise<boolean> {
+		pendingConversion = impact;
+		confirmingConversion = true;
+		return new Promise((resolve) => (answerConversion = resolve));
+	}
+
+	function settleConversion(confirmed: boolean) {
+		answerConversion?.(confirmed);
+		answerConversion = null;
+	}
+
+	$effect(() => {
+		if (!confirmingConversion) settleConversion(false);
+	});
+
+	async function moveItem({ dragId, targetId, intent }: DropRequest) {
+		const moved = await commitMove(store, budgetId, { itemId: dragId, targetId, intent }, askConversion);
+		pendingConversion = null;
+		// The item must not land in a hidden row: open the Group it was dropped into.
+		if (moved.ok && intent === 'inside' && collapsed.has(targetId)) collapsed = toggleCollapsed(collapsed, targetId);
+	}
 
 	async function addTopLevel() {
 		const added = store.addTopLevelItem(budgetId);
@@ -144,6 +173,7 @@
 			{/if}
 		</header>
 
+		<ConfirmConversionDialog impact={pendingConversion} bind:open={confirmingConversion} onconfirm={() => settleConversion(true)} />
 		<ConfirmDeleteDialog impact={pendingDelete} bind:open={confirmingDelete} onconfirm={confirmDelete} />
 
 		{#if ready}
@@ -185,7 +215,7 @@
 					ondelete={requestDelete}
 					onaddchild={addChild}
 					onnewitem={addTopLevel}
-					onmove={ignoreMove}
+					onmove={moveItem}
 				/>
 			</div>
 		{/if}

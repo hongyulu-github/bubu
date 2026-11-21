@@ -37,12 +37,13 @@ function openStore(items: Item[]) {
 
 const row = (n: number) => document.querySelector<HTMLElement>(`tr[data-item-id="${uuid(n)}"]`)!;
 const handle = (n: number) => page.elementLocator(row(n).querySelector('[data-drag-handle]')!);
-const at = (n: number, fraction: number) => ({
+const at = (n: number, fraction: number, x: number) => ({
 	target: page.elementLocator(row(n)),
-	targetPosition: { x: 20, y: row(n).getBoundingClientRect().height * fraction }
+	targetPosition: { x, y: row(n).getBoundingClientRect().height * fraction }
 });
-async function drag(from: number, onto: number, fraction: number) {
-	const { target, targetPosition } = at(onto, fraction);
+/** `x` is how far from the row's left edge the pointer is; the default is well right of every level zone. */
+async function drag(from: number, onto: number, fraction: number, x = 300) {
+	const { target, targetPosition } = at(onto, fraction, x);
 	await userEvent.dragAndDrop(handle(from), target, { targetPosition });
 }
 
@@ -82,6 +83,29 @@ describe('row drag and drop', () => {
 
 		await drag(ID.l3, ID.g1_2_1, 0.5); // three levels deep, inside Groups 1 and 1.2
 		expect(onmove).toHaveBeenCalledExactlyOnceWith({ dragId: uuid(ID.l3), targetId: uuid(ID.g1_2_1), intent: 'inside' });
+	});
+
+	it('left of a group\'s last row, below its middle, drops after the ancestor at that level', async () => {
+		const onmove = vi.fn();
+		render(BudgetSpreadsheet, { rows: openStore(tree()).rows, currency: 'EUR', onmove });
+
+		// 1.2.1 is the last row of Group 1.2, itself the last in Group 1: three levels deep (depth 2).
+		await drag(ID.l3, ID.g1_2_1, 0.85, 8); // level 0: after Group 1
+		await drag(ID.l3, ID.g1_2_1, 0.85, 40); // level 1: after Group 1.2
+		await drag(ID.l3, ID.g1_2_1, 0.85, 300); // right of the zones: a plain after on the row itself
+		expect(onmove.mock.calls.map(([request]) => request.targetId)).toEqual([uuid(ID.g1), uuid(ID.g1_2), uuid(ID.g1_2_1)]);
+		expect(onmove.mock.calls.map(([request]) => request.intent)).toEqual(['after', 'after', 'after']);
+	});
+
+	it('the left zone above the middle is still before, and only the last row of a group has it', async () => {
+		const onmove = vi.fn();
+		render(BudgetSpreadsheet, { rows: openStore(tree()).rows, currency: 'EUR', onmove });
+
+		await drag(ID.l3, ID.g1_2_1, 0.05, 8);
+		expect(onmove).toHaveBeenLastCalledWith({ dragId: uuid(ID.l3), targetId: uuid(ID.g1_2_1), intent: 'before' });
+
+		await drag(ID.l3, ID.g1_1, 0.85, 8); // 1.1 has a later sibling: left means nothing special
+		expect(onmove).toHaveBeenLastCalledWith({ dragId: uuid(ID.l3), targetId: uuid(ID.g1_1), intent: 'after' });
 	});
 
 	it('an expanded Group offers before and inside only: its bottom edge is inside', async () => {
