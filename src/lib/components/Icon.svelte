@@ -5,6 +5,8 @@
 		ArrowRightToBracketOutline,
 		CheckOutline,
 		ChevronDoubleDownOutline,
+		ChevronLeftOutline,
+		ChevronRightOutline,
 		ChevronDoubleUpOutline,
 		CloseOutline,
 		DotsHorizontalOutline,
@@ -34,7 +36,9 @@
 		addBelow: ArrowDownToBracketOutline,
 		addChild: ArrowRightToBracketOutline,
 		expandAll: ChevronDoubleDownOutline,
-		collapseAll: ChevronDoubleUpOutline
+		collapseAll: ChevronDoubleUpOutline,
+		previous: ChevronLeftOutline,
+		next: ChevronRightOutline
 	} as const satisfies Record<string, Component<any>>;
 
 	export type IconName = keyof typeof LIBRARY;

@@ -303,3 +303,16 @@ describe('selecting and managing Budgets in the drawer', () => {
 		await expect.element(page.getByRole('menuitem', { name: 'Clear all BuBu data…' })).toBeVisible();
 	});
 });
+
+describe('the template showcases', () => {
+	it('sit on the landing page and pass the chosen template id on without saving anything', async () => {
+		const fake = new FakeStorage();
+		const store = new BudgetStore({ storage: createBubuStorage(() => fake), history: new CommandHistory() });
+		store.hydrate();
+		const onusetemplate = vi.fn();
+		render(Landing, { store, navigate: vi.fn(), onusetemplate });
+		await page.getByRole('button', { name: 'Use template: Wedding' }).click();
+		expect(onusetemplate).toHaveBeenCalledExactlyOnceWith('wedding');
+		expect(fake.data.size).toBe(0); // showing and choosing a template creates no Budget
+	});
+});

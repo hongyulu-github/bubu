@@ -4,7 +4,7 @@ import { createItem, deriveItemKinds } from '../budget/model';
 import { isZero, toString } from '../budget/numbers';
 import { buildItemTree, deriveCodes } from '../budget/tree';
 import { validateItems } from '../budget/validation';
-import { copyTemplateItems, homeRenovationTemplate, templates, weddingTemplate, type BudgetTemplate } from './templates';
+import { copyTemplateItems, homeRenovationTemplate, templates, travelTemplate, weddingTemplate, type BudgetTemplate } from './templates';
 
 const BUDGET_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -94,10 +94,15 @@ describe.each(templates.map((template) => [template.id, template] as const))('%s
 });
 
 describe('the template list', () => {
-	it('offers exactly the Wedding and Home renovation templates, with unique ids', () => {
-		expect(templates).toEqual([weddingTemplate, homeRenovationTemplate]);
+	it('offers the Wedding, Home renovation and Travel templates, with unique ids', () => {
+		expect(templates).toEqual([weddingTemplate, homeRenovationTemplate, travelTemplate]);
 		expect(new Set(templates.map((template) => template.id)).size).toBe(templates.length);
 		expect(Object.isFrozen(templates)).toBe(true);
+	});
+
+	it('gives every template the same number of Items and Groups, so the showcases are equally tall', () => {
+		const shape = (template: BudgetTemplate) => [template.items.length, new Set(template.items.map((item) => item.parentId).filter((id) => id !== null)).size];
+		expect(templates.map(shape)).toEqual(templates.map(() => shape(homeRenovationTemplate)));
 	});
 
 	it('embeds no currency', () => {

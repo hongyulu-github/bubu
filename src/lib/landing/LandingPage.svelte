@@ -259,7 +259,7 @@
 	}
 
 	.below h2 {
-		font-size: var(--font-size-title);
+		font-size: clamp(1.75rem, 3vw, 2.5rem);
 		font-weight: var(--font-weight-bold);
 		letter-spacing: -0.01em;
 	}

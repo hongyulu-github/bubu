@@ -71,8 +71,7 @@ export const weddingTemplate: BudgetTemplate = define('wedding', 'Wedding', [
 	]),
 	group('attire', 'Attire and rings', [
 		line('attire-outfits', 'Outfits', 'outfit'),
-		line('attire-rings', 'Rings', 'pair'),
-		line('attire-beauty', 'Hair and make-up', 'person')
+		line('attire-rings', 'Rings', 'pair')
 	]),
 	group('entertainment', 'Photos and music', [
 		line('entertainment-photographer', 'Photographer', 'hour'),
@@ -107,7 +106,33 @@ export const homeRenovationTemplate: BudgetTemplate = define('home-renovation', 
 	])
 ]);
 
-export const templates: readonly BudgetTemplate[] = Object.freeze([weddingTemplate, homeRenovationTemplate]);
+export const travelTemplate: BudgetTemplate = define('travel', 'Travel', [
+	group('transport', 'Transport', [
+		line('transport-flights', 'Flights', 'ticket'),
+		line('transport-baggage', 'Checked luggage', 'bag'),
+		group('transport-local', 'Getting around', [
+			line('local-rail', 'Rail passes', 'pass'),
+			line('local-taxi', 'Taxis', 'ride')
+		])
+	]),
+	group('stay', 'Accommodation', [
+		line('stay-hotel', 'Hotel', 'night'),
+		line('stay-extras', 'Tourist tax and extras', 'night'),
+		line('stay-laundry', 'Laundry', 'load')
+	]),
+	group('food', 'Food and drink', [
+		line('food-breakfast', 'Breakfast', 'meal'),
+		line('food-lunch', 'Lunch', 'meal'),
+		line('food-dinner', 'Dinner out', 'meal')
+	]),
+	group('activities', 'Activities', [
+		line('activities-tours', 'Guided tours', 'tour'),
+		line('activities-tickets', 'Museum tickets', 'ticket')
+	]),
+	line('insurance', 'Travel insurance', 'policy')
+]);
+
+export const templates: readonly BudgetTemplate[] = Object.freeze([weddingTemplate, homeRenovationTemplate, travelTemplate]);
 
 /** A fresh, mutable copy of a template's Items, so one use can never change the definition or another use. */
 export function copyTemplateItems(template: BudgetTemplate): TemplateItem[] {
