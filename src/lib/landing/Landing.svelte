@@ -2,26 +2,34 @@
 	import BudgetsDrawer from '../budgets/BudgetsDrawer.svelte';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import LandingPage from './LandingPage.svelte';
+	import { templates, type BudgetTemplate } from '../templates/templates';
 	import TemplateShowcases from './TemplateShowcases.svelte';
 
 	let {
 		store = budgetStore,
-		navigate,
-		onusetemplate = () => {}
+		navigate
 	}: {
 		store?: BudgetStore;
 		/** Go to a path; the route passes SvelteKit's `goto`. */
 		navigate: (path: string) => void;
-		/** A "Use template" button was pressed with that template's id. The opening flow is separate (LUL-43). */
-		onusetemplate?: (templateId: string) => void;
 	} = $props();
 
 	let open = $state(false);
 	let view = $state<'list' | 'new'>('list');
+	/** The template chosen from a showcase; null for normal creation, which makes an empty Budget. */
+	let template = $state<BudgetTemplate | null>(null);
 
 	/** Open the drawer on the saved Budgets or on the new-Budget form. */
 	export function show(next: 'list' | 'new') {
+		template = null;
 		view = next;
+		open = true;
+	}
+
+	/** A showcase's "Use template": the same new-Budget form (name and currency), starting from that template. */
+	function useTemplate(templateId: string) {
+		template = templates.find((candidate) => candidate.id === templateId) ?? null;
+		view = 'new';
 		open = true;
 	}
 </script>
@@ -32,7 +40,7 @@
 	how the editor's back link and the retired /budgets and /budgets/new addresses arrive here.
 -->
 {#snippet showcases()}
-	<TemplateShowcases onuse={onusetemplate} />
+	<TemplateShowcases onuse={useTemplate} />
 {/snippet}
 <LandingPage oncreate={() => show('new')} onopenbudgets={() => show('list')} {showcases} />
-<BudgetsDrawer bind:open bind:view {store} oncreated={(budget) => navigate(`/budgets/${budget.id}`)} />
+<BudgetsDrawer bind:open bind:view {store} {template} oncreated={(budget) => navigate(`/budgets/${budget.id}`)} />

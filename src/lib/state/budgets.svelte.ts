@@ -10,6 +10,8 @@ import {
 	type NewItemFields
 } from '../budget/insert';
 import { renameBudgetDocument } from '../budget/rename';
+import { createBudgetFromTemplate } from '../templates/instantiate';
+import type { BudgetTemplate } from '../templates/templates';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
 import type { Budget, Item, ItemKind, Uuid } from '../budget/model';
 import { buildItemTree } from '../budget/tree';
@@ -208,6 +210,19 @@ export class BudgetStore {
 		if (!created.ok) return created;
 		this.setBudget(created.budget, []);
 		return created;
+	}
+
+	/**
+	 * Create a Budget from a landing-page template: the same form input and validation as a normal Budget, but with
+	 * copies of the template's Items under fresh UUIDs. It is saved in one step like any new Budget and is not selected.
+	 * Creating a Budget is not an Item command, so nothing is added to any undo history.
+	 */
+	createBudgetFromTemplate(template: BudgetTemplate, input: BudgetFormInput, options?: { now?: Date }): CreateBudgetResult {
+		const created = createBudgetFromTemplate(template, input, { now: this.#now(), ...options });
+		if (!created.ok) return created;
+		const saved = this.setBudget(created.budget, created.items);
+		if (!saved.ok) return { ok: false, errors: { name: 'The Budget could not be created from this template.' } };
+		return { ok: true, budget: created.budget };
 	}
 
 	/**

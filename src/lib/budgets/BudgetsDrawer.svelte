@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Budget } from '../budget/model';
+	import type { BudgetTemplate } from '../templates/templates';
 	import Drawer from '../components/Drawer.svelte';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import BudgetsList from './BudgetsList.svelte';
@@ -10,12 +11,15 @@
 		open = $bindable(false),
 		view = $bindable<'list' | 'new'>('list'),
 		store = budgetStore,
+		template = null,
 		oncreated
 	}: {
 		open?: boolean;
 		/** What the drawer shows: the saved Budgets, or the form for a new one. */
 		view?: 'list' | 'new';
 		store?: BudgetStore;
+		/** The landing-page template the new-Budget form starts from, or none for a normal empty Budget. */
+		template?: BudgetTemplate | null;
 		/** A Budget was created through the form; the caller opens its editor. */
 		oncreated: (budget: Budget) => void;
 	} = $props();
@@ -32,6 +36,7 @@
 	{:else}
 		<CreateBudgetForm
 			{store}
+			{template}
 			oncancel={() => (open = false)}
 			onCreated={(budget) => {
 				open = false;

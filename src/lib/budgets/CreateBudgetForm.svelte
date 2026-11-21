@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import type { Budget } from '../budget/model';
 	import { CURRENCIES } from '../budget/currencies';
 	import { validateBudgetForm, type BudgetFormErrors } from '../budget/create';
@@ -9,19 +9,23 @@
 	import Input from '../components/Input.svelte';
 	import Select from '../components/Select.svelte';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
+	import type { BudgetTemplate } from '../templates/templates';
 
 	let {
 		store = budgetStore,
 		onCreated,
-		oncancel
+		oncancel,
+		template = null
 	}: {
 		store?: BudgetStore;
 		/** Called after the Budget is in shared state; the caller opens its editor. */
 		onCreated: (budget: Budget) => void;
 		oncancel: () => void;
+		/** A starter template chosen on the landing page: the Budget starts with its Items. Normal creation passes none. */
+		template?: BudgetTemplate | null;
 	} = $props();
 
-	let name = $state('');
+	let name = $state(untrack(() => template?.name ?? '')); // the form is made fresh each time the drawer opens
 	let currency = $state('');
 	// Errors only appear after the first submit attempt, then update as the user corrects the form.
 	let attempted = $state(false);
@@ -44,7 +48,7 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		attempted = true;
-		const result = store.createBudget({ name, currency });
+		const result = template ? store.createBudgetFromTemplate(template, { name, currency }) : store.createBudget({ name, currency });
 		if (result.ok) {
 			onCreated(result.budget);
 			return;
@@ -55,6 +59,9 @@
 </script>
 
 <div class="form-body">
+	{#if template}
+		<p class="alt">Starting from the {template.name} template: its Items are copied into your new Budget, with no prices.</p>
+	{/if}
 	<form bind:this={form} novalidate onsubmit={submit}>
 		<Input label="Name" bind:value={name} error={errors.name} autocomplete="off" />
 		<Select
@@ -70,12 +77,14 @@
 			<Button type="submit" variant="primary" disabled={store.hydrationStatus === 'idle'}>Create Budget</Button>
 		</div>
 	</form>
+	{#if !template}
 	<div class="alt">
 		Prefer to start in Excel?
 		<button type="button" class="link" onclick={getTemplate}>Download an empty template</button>
 		or
 		<ImportBudgetFlow {store} onImported={onCreated} />
 	</div>
+	{/if}
 	{#if templateFailed}
 		<p class="alt problem" role="alert">The template could not be created. Please try again.</p>
 	{/if}

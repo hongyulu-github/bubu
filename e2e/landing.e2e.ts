@@ -226,3 +226,43 @@ describe('the landing page (built static site)', () => {
 		expect(requests.filter((url) => /\.(woff2?|ttf|otf|eot)(\?|$)/i.test(url))).toEqual([]);
 	});
 });
+
+describe('starting from a template (built static site)', () => {
+	const rows = () =>
+		page.locator('table[aria-label="Budget Items"] tbody tr').evaluateAll((trs) =>
+			trs.map((tr) => [...tr.querySelectorAll('td')].slice(0, 2).map((cell) => cell.querySelector('input')?.value ?? cell.textContent?.trim()).join(' '))
+		);
+
+	it('creates the Wedding hierarchy in the chosen currency, opens its editor, and keeps it after a reload', async () => {
+		await page.goto(`${baseUrl}/`);
+		await page.waitForLoadState('networkidle');
+		await page.getByRole('button', { name: 'Use template: Wedding' }).click();
+		await page.getByRole('dialog', { name: 'New budget' }).waitFor();
+		await page.getByLabel('Name').fill('Our wedding');
+		await page.getByLabel('Currency').selectOption('DKK');
+		await page.getByRole('button', { name: 'Create Budget' }).click();
+
+		await page.getByRole('heading', { level: 1, name: 'Our wedding' }).waitFor();
+		await page.locator('dialog[open]').waitFor({ state: 'detached' });
+		expect(await page.locator('main').innerText()).toContain('DKK');
+		const before = await rows();
+		expect(before).toHaveLength(18);
+		expect(before.slice(0, 3)).toEqual(['1 Venue', '1.1 Venue hire', '1.2 Decoration and flowers']);
+		expect(await page.getByLabel('Grand total', { exact: true }).innerText()).toMatch(/0\.00/);
+
+		await page.reload();
+		await page.getByRole('heading', { level: 1, name: 'Our wedding' }).waitFor();
+		expect(await rows()).toEqual(before);
+	});
+
+	it('leaves the Create a budget button making an empty Budget', async () => {
+		await page.goto(`${baseUrl}/`);
+		await page.waitForLoadState('networkidle');
+		await create().click();
+		await page.getByLabel('Name').fill('Plain');
+		await page.getByLabel('Currency').selectOption('EUR');
+		await page.getByRole('button', { name: 'Create Budget' }).click();
+		await page.getByRole('heading', { level: 1, name: 'Plain' }).waitFor();
+		expect(await rows()).toEqual([]);
+	});
+});
