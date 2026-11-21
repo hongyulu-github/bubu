@@ -109,7 +109,7 @@ describe('the landing page (built static site)', () => {
 		await page.getByRole('link', { name: /Wedding/ }).click();
 
 		await page.waitForURL(`${baseUrl}/budgets/${WEDDING}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		expect(await page.getByLabel('Description 1', { exact: true }).inputValue()).toBe('Venue');
 		expect(await page.getByLabel('Grand total', { exact: true }).innerText()).toBe('€250.00'); // 100 x 2 + 50
 
@@ -192,7 +192,7 @@ describe('the landing page (built static site)', () => {
 	it('the editor\'s back link returns to the main page with the saved Budgets drawer open', async () => {
 		await seedWedding();
 		await page.goto(`${baseUrl}/budgets/${WEDDING}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 
 		await page.getByRole('link', { name: /All Budgets/ }).click();
 		await drawer('My budgets').waitFor();
@@ -205,13 +205,14 @@ describe('the landing page (built static site)', () => {
 		expect(await drawer('My budgets').count()).toBe(0);
 	});
 
-	it('fits on one screen without scrolling at common window sizes, with both buttons in view', async () => {
+	it('fits its first screen without scrolling at common window sizes, with both buttons in view', async () => {
 		for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]]) {
 			await page.setViewportSize({ width, height });
 			await page.goto(`${baseUrl}/`);
 			await create().waitFor();
-			const [scrollHeight, innerHeight] = await page.evaluate(() => [document.documentElement.scrollHeight, window.innerHeight]);
-			expect(scrollHeight, `${width}x${height}`).toBeLessThanOrEqual(innerHeight);
+			// The first screen is the main block; the template showcases sit below it, so the page itself may scroll.
+			const mainHeight = await page.evaluate(() => document.querySelector('main')!.getBoundingClientRect().height);
+			expect(mainHeight, `${width}x${height}`).toBeLessThanOrEqual(height);
 			for (const button of [create(), mine()]) expect(await button.boundingBox()).toMatchObject({ y: expect.any(Number) });
 			expect(await create().isVisible()).toBe(true);
 			expect((await page.locator('.support').boundingBox())!.y + (await page.locator('.support').boundingBox())!.height).toBeLessThanOrEqual(height);

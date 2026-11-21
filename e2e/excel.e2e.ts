@@ -110,7 +110,7 @@ describe('ExcelJS in the built static site', () => {
 		const requests: string[] = [];
 		page.on('request', (request) => requests.push(request.url()));
 		await page.goto(`${baseUrl}/budgets/${id}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		await page.waitForLoadState('networkidle');
 		requests.length = 0;
 

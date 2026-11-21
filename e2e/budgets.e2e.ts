@@ -75,14 +75,14 @@ const items = () =>
 describe('Budgets list and editor routes (built static site)', () => {
 	it('moves between two Budget editors through the list without mixing Items', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		await page.getByRole('link', { name: /All Budgets/ }).click();
 		await page.getByRole('link', { name: /Renovation/ }).click();
 		await page.getByRole('heading', { name: 'Renovation' }).waitFor();
 		expect(await items()).toEqual(['1 Paint', '2 Flooring']);
 		await page.goBack(); // list
 		await page.goBack(); // Wedding editor
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		expect(await items()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
 	});
 
@@ -258,9 +258,9 @@ describe('Building a Budget from nothing (built static site)', () => {
 describe('Renaming a Budget (built static site)', () => {
 	it('renames in place from the editor title, keeps the Items, and shows the new name in the list', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 
-		await page.getByRole('heading', { name: 'Wedding' }).dblclick();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).dblclick();
 		await page.getByLabel('Budget name').fill('');
 		await page.keyboard.press('Enter');
 		await page.getByText('Enter a name for the Budget.').waitFor();
@@ -278,11 +278,11 @@ describe('Renaming a Budget (built static site)', () => {
 
 	it('leaves the name alone when cancelled with Escape', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		await page.getByRole('button', { name: 'Rename Budget' }).click();
 		await page.getByLabel('Budget name').fill('Nope');
 		await page.keyboard.press('Escape');
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		expect(await page.getByRole('heading', { name: 'Nope' }).count()).toBe(0);
 	});
 
@@ -306,7 +306,7 @@ describe('Deleting Items (built static site)', () => {
 
 	it('confirms before deleting a Group, can cancel, deletes the subtree, and undoes it', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		expect(await rows()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
 
 		await page.getByRole('button', { name: 'Delete 1', exact: true }).click();
@@ -356,7 +356,7 @@ describe('Duplicating a Budget (built static site)', () => {
 		// The original is untouched, and has no history of the copy's edits.
 		await page.getByRole('link', { name: /All Budgets/ }).click();
 		await page.getByRole('link', { name: /^Wedding EUR/ }).click();
-		await page.getByRole('heading', { name: 'Wedding', exact: true }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding', exact: true }).waitFor();
 		expect(await items()).toEqual(['1 Venue', '1.1 Hall rental', '2 Music']);
 		expect(await page.getByRole('button', { name: 'Undo' }).isDisabled()).toBe(true);
 
@@ -457,7 +457,7 @@ describe('Everything is saved automatically (built static site)', () => {
 
 	it('keeps a rename, a duplicate and an edit to a seeded Budget after a reload', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		await page.getByRole('button', { name: 'Rename Budget' }).click();
 		await page.getByLabel('Budget name').fill('Renamed');
 		await page.keyboard.press('Enter');
@@ -767,7 +767,7 @@ describe('Undo and redo shortcuts (built static site)', () => {
 
 		await page.getByRole('link', { name: /All Budgets/ }).click();
 		await page.getByRole('link', { name: /Wedding/ }).click();
-		await page.getByRole('heading', { name: 'Wedding' }).waitFor();
+		await page.getByRole('heading', { level: 1, name: 'Wedding' }).waitFor();
 		expect(await field('Quantity 2').inputValue()).toBe('9'); // untouched by B's undo
 		expect(await undoDisabled()).toBe(false);
 		await page.keyboard.press('Control+z');
