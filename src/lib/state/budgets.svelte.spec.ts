@@ -4,6 +4,8 @@ import { createBudget, createItem, type Item } from '../budget/model';
 import { toString } from '../budget/numbers';
 import { CommandHistory } from '../history/commands';
 import { budgetKey, createBubuStorage, itemsKey, bubuStorage } from '../storage/bubu';
+import { FakeStorage } from '../testing/fake-storage';
+import { BudgetPersistence } from './persistence.svelte';
 import { BudgetStore } from './budgets.svelte';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -528,6 +530,169 @@ describe('adding Items', () => {
 		expect(store.canUndo(A)).toBe(true);
 		expect(store.canUndo(B)).toBe(false);
 		expect(store.itemsOf(B)).toHaveLength(1);
+	});
+});
+
+describe('importBudget', () => {
+	/** A storage whose writes can be made to fail for chosen keys, to test that an import is all or nothing. */
+	class SelectiveStorage extends FakeStorage {
+		failKeys: string[] = [];
+		setItem(key: string, value: string) {
+			if (this.failKeys.some((prefix) => key.startsWith(prefix))) throw new Error('quota');
+			super.setItem(key, value);
+		}
+	}
+	function setup() {
+		const fake = new SelectiveStorage();
+		const storage = createBubuStorage(() => fake);
+		storage.writeBudget(budget(A, 'Wedding'));
+		storage.writeItems(A, nestedA());
+		storage.writeBudget(budget(B, 'Renovation'));
+		storage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore({ storage });
+		store.hydrate();
+		return { fake, storage, store };
+	}
+	const incoming = (id: string, name = 'Imported') => ({
+		budget: budget(id, name),
+		items: [item(id, 11, null, '5'), item(id, 12, 11, '7', '2')]
+	});
+	const snapshot = (fake: FakeStorage) => JSON.stringify([...fake.data.entries()].sort());
+
+	it('saves a new Budget and its Items, then publishes them, touching nothing else', () => {
+		const { fake, store } = setup();
+		const C = '33333333-3333-4333-8333-333333333333';
+		store.select(B);
+		const others = { a: store.budgets.find((b) => b.id === A), itemsA: store.itemsOf(A) };
+		const { budget: imported, items } = incoming(C);
+
+		expect(store.importBudget(imported, items)).toEqual({ ok: true });
+
+		expect(store.budgets.map((b) => b.id)).toEqual([A, B, C]);
+		expect(store.itemsOf(C)).toBe(items);
+		expect(fake.data.has(`bubu:budget:${C}`)).toBe(true);
+		expect(fake.data.has(`bubu:items:${C}`)).toBe(true);
+		expect(store.activeBudgetId).toBe(B); // the active Budget is not changed
+		expect(store.budgets.find((b) => b.id === A)).toBe(others.a);
+		expect(store.itemsOf(A)).toBe(others.itemsA);
+	});
+
+	it('is not an Item command: it adds no history', () => {
+		const { store } = setup();
+		const C = '33333333-3333-4333-8333-333333333333';
+		store.importBudget(incoming(C).budget, incoming(C).items);
+		expect(store.canUndo(C)).toBe(false);
+		expect(store.undo(C)).toBe(false);
+	});
+
+	it('never overwrites a saved Budget unless told to, and then changes nothing', () => {
+		const { fake, store } = setup();
+		const before = snapshot(fake);
+		const budgets = store.budgets;
+		store.editItem(A, uuid(3), 'quantity', '9');
+		const afterEdit = snapshot(fake);
+		void before;
+
+		const { budget: imported, items } = incoming(A);
+		expect(store.importBudget(imported, items)).toEqual({ ok: false, reason: 'exists' });
+
+		expect(snapshot(fake)).toBe(afterEdit);
+		expect(store.budgets.length).toBe(budgets.length);
+		expect(store.canUndo(A)).toBe(true);
+	});
+
+	it('rejects invalid data before writing anything', () => {
+		const { fake, store } = setup();
+		const before = snapshot(fake);
+		const C = '33333333-3333-4333-8333-333333333333';
+		const result = store.importBudget({ ...budget(C, 'x'), currency: 'euro' }, incoming(C).items);
+		expect(result).toMatchObject({ ok: false, reason: 'invalid' });
+		const dangling = store.importBudget(budget(C, 'x'), [item(C, 1, 99, '1')]);
+		expect(dangling).toMatchObject({ ok: false, reason: 'invalid' });
+		expect(snapshot(fake)).toBe(before);
+		expect(store.budgets).toHaveLength(2);
+	});
+
+	it('replaces on request: the new document and Items are saved, and only that Budget\'s history is dropped', () => {
+		const { fake, store } = setup();
+		store.editItem(A, uuid(3), 'quantity', '9');
+		store.editItem(B, uuid(1), 'description', 'edited B');
+		expect(store.canUndo(A) && store.canUndo(B)).toBe(true);
+		const itemsB = store.itemsOf(B);
+		const { budget: imported, items } = incoming(A, 'Replaced');
+
+		expect(store.importBudget(imported, items, { replace: true })).toEqual({ ok: true });
+
+		expect(store.budgets.find((b) => b.id === A)!.name).toBe('Replaced');
+		expect(store.itemsOf(A)).toBe(items);
+		expect(JSON.parse(fake.data.get(`bubu:budget:${A}`)!).data.name).toBe('Replaced');
+		expect(JSON.parse(fake.data.get(`bubu:items:${A}`)!).data).toHaveLength(2);
+		expect(store.canUndo(A)).toBe(false); // an earlier command can no longer overwrite the imported document
+		expect(store.undo(A)).toBe(false);
+		expect(store.itemsOf(A)).toBe(items);
+		expect(store.canUndo(B)).toBe(true); // another Budget keeps its history
+		expect(store.itemsOf(B)).toBe(itemsB);
+	});
+
+	it('leaves nothing behind when saving the Items fails', () => {
+		const { fake, store } = setup();
+		const before = snapshot(fake);
+		fake.failKeys = ['bubu:items:'];
+		const C = '33333333-3333-4333-8333-333333333333';
+
+		const result = store.importBudget(incoming(C).budget, incoming(C).items);
+
+		expect(result).toMatchObject({ ok: false, reason: 'storage' });
+		expect(snapshot(fake)).toBe(before);
+		expect(store.budgets).toHaveLength(2);
+	});
+
+	it('removes the Items it already wrote when saving the document fails: no partial Budget', () => {
+		const { fake, store } = setup();
+		const before = snapshot(fake);
+		fake.failKeys = ['bubu:budget:'];
+		const C = '33333333-3333-4333-8333-333333333333';
+
+		const result = store.importBudget(incoming(C).budget, incoming(C).items);
+
+		expect(result).toMatchObject({ ok: false, reason: 'storage' });
+		expect(fake.data.has(`bubu:items:${C}`)).toBe(false);
+		expect(snapshot(fake)).toBe(before);
+		expect(store.budgets.map((b) => b.id)).toEqual([A, B]);
+	});
+
+	it('puts a replaced Budget back exactly when saving fails halfway, keeping its memory and history', () => {
+		const { fake, storage, store } = setup();
+		const autosave = new BudgetPersistence(store, storage);
+		autosave.flush(); // the loaded Budgets are the baseline...
+		store.editItem(A, uuid(3), 'quantity', '9');
+		autosave.flush(); // ...and the edit is saved, as the running app does
+		const before = snapshot(fake);
+		const itemsA = store.itemsOf(A);
+		const budgetA = store.budgets.find((b) => b.id === A);
+		fake.failKeys = ['bubu:budget:'];
+
+		const result = store.importBudget(incoming(A, 'Replaced').budget, incoming(A).items, { replace: true });
+
+		expect(result).toMatchObject({ ok: false, reason: 'storage' });
+		fake.failKeys = [];
+		expect(snapshot(fake)).toBe(before); // the saved Items and document are as they were
+		expect(store.itemsOf(A)).toBe(itemsA);
+		expect(store.budgets.find((b) => b.id === A)).toBe(budgetA);
+		expect(store.canUndo(A)).toBe(true);
+	});
+
+	it('treats a saved but unreadable Budget with the same id as a conflict too', () => {
+		const { fake, store } = setup();
+		const C = '33333333-3333-4333-8333-333333333333';
+		fake.data.set(`bubu:budget:${C}`, '{broken');
+		store.hydrate();
+		expect(store.loadIssues.some((i) => i.budgetId === C)).toBe(true);
+
+		expect(store.importBudget(incoming(C).budget, incoming(C).items)).toEqual({ ok: false, reason: 'exists' });
+		expect(fake.data.get(`bubu:budget:${C}`)).toBe('{broken'); // untouched
+		expect(store.importBudget(incoming(C).budget, incoming(C).items, { replace: true })).toEqual({ ok: true });
+		expect(store.loadIssues.some((i) => i.budgetId === C)).toBe(false);
 	});
 });
 

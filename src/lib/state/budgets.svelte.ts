@@ -13,7 +13,7 @@ import { renameBudgetDocument } from '../budget/rename';
 import { createBudgetDocument, type BudgetFormInput, type CreateBudgetResult } from '../budget/create';
 import type { Budget, Item, ItemKind, Uuid } from '../budget/model';
 import { buildItemTree } from '../budget/tree';
-import { validateBudget, validateItems, type ValidationIssue } from '../budget/validation';
+import { validateBudget, validateBudgetData, validateItems, type ValidationIssue } from '../budget/validation';
 import { CommandHistory, sessionHistory } from '../history/commands';
 import { bubuStorage, type BubuStorage, type StorageError } from '../storage/bubu';
 
@@ -64,6 +64,13 @@ export type DuplicateBudgetResult =
 	| { ok: true; budget: Budget }
 	| { ok: false; reason: 'unknown-budget' }
 	| { ok: false; reason: 'invalid'; issues: ValidationIssue[] };
+
+export type ImportBudgetResult =
+	| { ok: true }
+	| { ok: false; reason: 'invalid'; issues: ValidationIssue[] }
+	/** A Budget with this id is already saved (or is saved but unreadable) and `replace` was not set. */
+	| { ok: false; reason: 'exists' }
+	| { ok: false; reason: 'storage'; error: StorageError };
 
 export type ClearAllResult = { ok: true } | { ok: false; error: StorageError };
 export type DeleteBudgetResult = { ok: true } | { ok: false; reason: 'unknown-budget' };
@@ -233,6 +240,49 @@ export class BudgetStore {
 
 		this.setBudget(copy.budget, copy.items);
 		return { ok: true, budget: copy.budget };
+	}
+
+	/**
+	 * Save an imported Budget and its Items as one unit, then publish it. The data is checked first, then
+	 * written to storage (Items first, the document last, so a Budget never appears without its Items); if
+	 * either write fails everything is put back as it was and nothing in memory changes. It never overwrites a
+	 * saved Budget unless `replace` says so, and replacing discards that Budget's undo history so no earlier
+	 * command can write over the imported document. An import is not an Item command and cannot be undone.
+	 * Other Budgets, their history and the active Budget are untouched.
+	 */
+	importBudget(budget: Budget, items: readonly Item[], { replace = false }: { replace?: boolean } = {}): ImportBudgetResult {
+		const issues = validateBudgetData(budget, items);
+		if (issues.length > 0) return { ok: false, reason: 'invalid', issues };
+
+		const existing = this.budgets.find((candidate) => candidate.id === budget.id);
+		const unreadable = this.loadIssues.some((issue) => issue.budgetId === budget.id);
+		if ((existing || unreadable) && !replace) return { ok: false, reason: 'exists' };
+
+		const previousItems = existing ? this.itemsOf(budget.id) : null;
+		const rollBack = () => {
+			if (existing && previousItems) {
+				this.#storage.writeItems(existing.id, previousItems);
+				this.#storage.writeBudget(existing);
+			} else if (!unreadable) {
+				this.#storage.deleteBudget(budget.id);
+			}
+		};
+		// Only an explicit replace may overwrite data that could not be read.
+		const options = { overwriteUnreadable: unreadable };
+		for (const write of [() => this.#storage.writeItems(budget.id, items, options), () => this.#storage.writeBudget(budget, options)]) {
+			const written = write();
+			if (!written.ok) {
+				rollBack();
+				return { ok: false, reason: 'storage', error: written.error };
+			}
+		}
+
+		this.budgets = existing ? this.budgets.map((candidate) => (candidate.id === budget.id ? budget : candidate)) : [...this.budgets, budget];
+		this.#itemsByBudget = { ...this.#itemsByBudget, [budget.id]: items };
+		this.loadIssues = this.loadIssues.filter((issue) => issue.budgetId !== budget.id);
+		if (existing) this.#history.clear(budget.id);
+		this.#historyVersion++;
+		return { ok: true };
 	}
 
 	/**

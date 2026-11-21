@@ -1,5 +1,7 @@
 import { chromium, type Browser } from 'playwright';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { createBudget, createItem } from '../src/lib/budget/model';
+import { exportBudget } from '../src/lib/excel/export-budget';
 import { decodeBudgetWorkbook } from '../src/lib/excel/metadata';
 import { readWorkbook } from '../src/lib/excel/workbook';
 
@@ -123,6 +125,35 @@ describe('ExcelJS in the built static site', () => {
 		expect(decoded.budget.name).toBe('Wedding');
 		expect(decoded.rows.map((row) => [row.code, row.description, row.unitPrice])).toEqual([['1', 'Venue', '0'], ['1.1', 'Hall', '19.990']]);
 		expect(requests.filter((url) => !url.startsWith(baseUrl) && !url.startsWith('blob:'))).toEqual([]);
+		await page.context().close();
+	});
+
+	it('imports an exported workbook on the built site, opens its editor and keeps it after a reload', async () => {
+		const id = '44444444-4444-4444-8444-444444444444';
+		const budget = createBudget({ id, name: 'Imported wedding', currency: 'EUR', now: new Date('2026-02-01T00:00:00.000Z') });
+		const items = [
+			createItem({ id: '00000000-0000-4000-8000-000000000001', budgetId: id, description: 'Venue', quantity: '2' }),
+			createItem({ id: '00000000-0000-4000-8000-000000000002', budgetId: id, parentId: '00000000-0000-4000-8000-000000000001', description: 'Hall', unitPrice: '19.990', unit: 'days' })
+		];
+		const blob = await exportBudget(budget, items);
+
+		const page = await (await browser.newContext()).newPage();
+		await page.goto(`${baseUrl}/budgets/new`);
+		await page.waitForLoadState('networkidle'); // hydrated before the file is chosen
+		await page.locator('input[type="file"]').setInputFiles({
+			name: 'wedding.xlsx',
+			mimeType: blob.type,
+			buffer: Buffer.from(await blob.arrayBuffer())
+		});
+
+		await page.waitForURL(`${baseUrl}/budgets/${id}`);
+		await page.getByRole('heading', { name: 'Imported wedding' }).waitFor();
+		await page.getByLabel('Description 1.1', { exact: true }).waitFor();
+		expect(await page.getByLabel('Description 1.1', { exact: true }).inputValue()).toBe('Hall');
+
+		await page.reload();
+		await page.getByRole('heading', { name: 'Imported wedding' }).waitFor();
+		expect(await page.getByLabel('Unit price 1.1', { exact: true }).inputValue()).toBe('19.990');
 		await page.context().close();
 	});
 });

@@ -4,6 +4,7 @@
 	import { CURRENCIES } from '../budget/currencies';
 	import { validateBudgetForm, type BudgetFormErrors } from '../budget/create';
 	import { downloadTemplate } from '../excel/template';
+	import ImportBudgetFlow from './ImportBudgetFlow.svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Select from '../components/Select.svelte';
@@ -68,10 +69,12 @@
 			<Button type="submit" variant="primary" disabled={store.hydrationStatus === 'idle'}>Create Budget</Button>
 		</div>
 	</form>
-	<p class="alt">
+	<div class="alt">
 		Prefer to start in Excel?
 		<button type="button" class="link" onclick={getTemplate}>Download an empty template</button>
-	</p>
+		or
+		<ImportBudgetFlow {store} onImported={onCreated} />
+	</div>
 	{#if templateFailed}
 		<p class="alt problem" role="alert">The template could not be created. Please try again.</p>
 	{/if}
