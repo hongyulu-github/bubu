@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Seo from '#lib/components/Seo.svelte';
 	import { Button, Dialog, Input, NumberInput, TableCell } from '#lib';
 
 	let open = $state(false);
@@ -12,6 +13,8 @@
 		else document.documentElement.dataset.appearance = theme;
 	});
 </script>
+
+<Seo name="Design preview" noindex />
 
 <main>
 	<h1>Design foundation</h1>

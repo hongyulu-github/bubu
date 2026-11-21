@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Seo from '#lib/components/Seo.svelte';
 	import { createWorkbook, readWorkbook, writeWorkbook } from '../../../lib/excel/workbook';
 
 	// Smoke page for the built static site (LUL-33): proves ExcelJS loads and runs in the browser from the
@@ -17,6 +18,8 @@
 		}
 	}
 </script>
+
+<Seo name="Excel prototype" noindex />
 
 <main>
 	<h1>Excel smoke test</h1>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Button from '../components/Button.svelte';
+	import Seo from '../components/Seo.svelte';
 	import Icon from '../components/Icon.svelte';
 	import FeatureCard from './FeatureCard.svelte';
 
@@ -21,9 +22,7 @@
 	} = $props();
 </script>
 
-<svelte:head>
-	<title>BuBu: build Budgets, one Item at a time</title>
-</svelte:head>
+<Seo />
 
 <!--
 	One screen, read in a path: the name (top left), the headline, one line of what it does, the two buttons, then the

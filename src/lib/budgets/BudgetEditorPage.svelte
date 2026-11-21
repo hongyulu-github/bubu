@@ -11,6 +11,7 @@
 	import type { ConversionImpact } from '../budget/convert';
 	import { exportBudget, exportFilename } from '../excel/export-budget';
 	import { saveBlob } from '../excel/template';
+	import Seo from '../components/Seo.svelte';
 	import StatusMessage from '../components/StatusMessage.svelte';
 	import { EXCEL_FAILURES } from '../errors/messages';
 	import { commitMove } from '../editor/move';
@@ -167,6 +168,9 @@
 </script>
 
 <svelte:window {onkeydown} />
+
+<!-- Only the landing page belongs in search results: a Budget is empty for anyone but its owner. -->
+<Seo name={budget?.name ?? 'Budget'} noindex />
 
 <main>
 	<p><a class="back" href="/?budgets">← All Budgets</a></p>
