@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '../components/Button.svelte';
 	import StatusMessage from '../components/StatusMessage.svelte';
 	import { describeUnreadable } from '../errors/messages';
 	import { tick } from 'svelte';
@@ -13,11 +14,14 @@
 
 	let {
 		store = budgetStore,
-		announcement = ''
+		announcement = '',
+		oncreate
 	}: {
 		store?: BudgetStore;
 		/** Something that happened elsewhere (clearing all data), announced with the list's own messages. */
 		announcement?: string;
+		/** Start the normal Budget creation flow (an empty Budget). The empty state offers it when this is given. */
+		oncreate?: () => void;
 	} = $props();
 
 	// Most recently changed first; name and id keep the order stable.
@@ -121,7 +125,13 @@
 		{/if}
 
 		{#if budgets.length === 0}
-			<p class="note">No saved Budgets yet.</p>
+			<!-- A fresh browser, the last Budget deleted, or all data cleared: say so, and offer the one way forward. Showing
+			     this creates nothing; the button starts the normal creation flow, which makes an empty Budget. -->
+			<div class="empty">
+				<h3>No saved Budgets yet.</h3>
+				<p class="note">A Budget is a tree of Items whose Totals add up on their own. Everything stays on this device.</p>
+				{#if oncreate}<Button variant="primary" onclick={oncreate}>Create your first Budget</Button>{/if}
+			</div>
 		{:else}
 			<ul>
 				{#each budgets as budget (budget.id)}
@@ -294,5 +304,21 @@
 	.note {
 		margin: 0;
 		color: var(--color-text-secondary);
+	}
+
+	.empty {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-3);
+		padding: var(--space-5) 0;
+	}
+
+	.empty h3 {
+		margin: 0;
+		font-size: var(--font-size-title);
+		font-weight: var(--font-weight-bold);
+		line-height: var(--line-height-tight);
+		color: var(--color-text);
 	}
 </style>

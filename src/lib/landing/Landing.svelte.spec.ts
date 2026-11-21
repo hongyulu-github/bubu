@@ -349,3 +349,47 @@ describe('the template showcases', () => {
 		expect(store.itemsOf(store.budgets[0].id)).toHaveLength(0);
 	});
 });
+
+describe('the empty Budgets drawer', () => {
+	const createFirst = () => page.getByRole('button', { name: 'Create your first Budget' });
+
+	it('in a fresh browser offers normal creation, which makes an empty Budget and opens its editor', async () => {
+		const { store, navigate, fake } = setup({ saved: false });
+		await mine().click();
+		await settled();
+		await expect.element(page.getByRole('heading', { name: 'No saved Budgets yet.' })).toBeVisible();
+		expect(fake.data.size).toBe(0); // showing it creates nothing
+
+		await createFirst().click();
+		await expect.element(drawer('New budget')).toBeVisible();
+		await expect.element(page.getByLabelText('Name')).toHaveFocus();
+		await submit('First', 'EUR');
+		await vi.waitFor(() => expect(navigate).toHaveBeenCalledOnce());
+		expect(store.itemsOf(store.budgets[0].id)).toHaveLength(0); // no template, no placeholder Item
+	});
+
+	it('after clearing all BuBu data shows the same state, and its action still creates a Budget', async () => {
+		const { store, navigate } = setup();
+		await mine().click();
+		await settled();
+		await page.getByRole('button', { name: 'More actions' }).click();
+		await page.getByRole('menuitem', { name: 'Clear all BuBu data…' }).click();
+		await page.getByRole('dialog', { name: 'Clear all BuBu data?' }).getByRole('button', { name: 'Clear all BuBu data' }).click();
+		await expect.element(page.getByRole('heading', { name: 'No saved Budgets yet.' })).toBeVisible();
+		expect(store.budgets).toHaveLength(0);
+
+		await createFirst().click();
+		await submit('Again', 'USD');
+		await vi.waitFor(() => expect(navigate).toHaveBeenCalledOnce());
+		expect(store.budgets.map((budget) => budget.name)).toEqual(['Again']);
+		expect(store.itemsOf(store.budgets[0].id)).toHaveLength(0);
+	});
+
+	it('after the last Budget is deleted shows it again', async () => {
+		const { store } = setup();
+		for (const budget of [...store.budgets]) store.deleteBudget(budget.id);
+		await mine().click();
+		await settled();
+		await expect.element(createFirst()).toBeVisible();
+	});
+});
