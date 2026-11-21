@@ -316,7 +316,7 @@ export class BudgetStore {
 	/**
 	 * Add a child under an Item as one undoable command. Adding the first child to a Line also
 	 * converts it to a Group in the same command (its manual Unit price is replaced; undo restores
-	 * it). The caller is responsible for confirming that conversion first, via `describeConversion`.
+	 * it), with no confirmation.
 	 */
 	addChildItem(budgetId: Uuid, parentId: Uuid, fields?: NewItemFields): AddChildResult {
 		if (!this.budgets.some((budget) => budget.id === budgetId)) return { ok: false, reason: 'unknown-budget' };

@@ -383,7 +383,7 @@ describe('Duplicating a Budget (built static site)', () => {
 describe('Adding child Items (built static site)', () => {
 	const total = () => page.getByLabel('Grand total', { exact: true }).innerText();
 
-	it('confirms the Line-to-Group conversion, keeps the Quantity, and undoes the whole thing', async () => {
+	it('converts a Line to a Group on Add child, keeps the Quantity, and undoes the whole thing', async () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
 		await page.getByLabel('Unit price 2', { exact: true }).waitFor(); // Music is a Line
 		await page.getByLabel('Unit price 2', { exact: true }).fill('-250.5');
@@ -392,15 +392,8 @@ describe('Adding child Items (built static site)', () => {
 		await page.keyboard.press('Enter');
 		await expect.poll(total).toBe('-€751.50');
 
-		// Cancel: nothing changes.
+		// Converted at once, Quantity kept, child added.
 		await page.getByRole('button', { name: 'Add child to 2', exact: true }).click();
-		await page.getByRole('dialog', { name: /into a group/ }).waitFor();
-		await page.getByRole('button', { name: 'Cancel' }).click();
-		expect(await page.getByLabel('Unit price 2', { exact: true }).inputValue()).toBe('-250.5');
-
-		// Confirm: converted, Quantity kept, child added.
-		await page.getByRole('button', { name: 'Add child to 2', exact: true }).click();
-		await page.getByRole('button', { name: 'Convert and add item' }).click();
 		await page.getByLabel('Description 2.1', { exact: true }).waitFor();
 		expect(await page.getByLabel('Quantity 2', { exact: true }).inputValue()).toBe('3');
 		expect(await page.getByLabel('Unit price 2', { exact: true }).count()).toBe(0);
@@ -456,7 +449,6 @@ describe('Everything is saved automatically (built static site)', () => {
 		await page.getByLabel('Quantity 1', { exact: true }).fill('0.125');
 		await page.keyboard.press('Enter');
 		await page.getByRole('button', { name: 'Add child to 1', exact: true }).click();
-		await page.getByRole('button', { name: 'Convert and add item' }).click();
 		await page.getByLabel('Description 1.1', { exact: true }).fill('Hall');
 		await page.keyboard.press('Enter');
 		const url = page.url();
@@ -744,7 +736,6 @@ describe('Undo and redo shortcuts (built static site)', () => {
 		await expect.poll(total).toBe('€21.00');
 
 		await page.getByRole('button', { name: 'Add child to 2', exact: true }).click();
-		await page.getByRole('button', { name: 'Convert and add item' }).click();
 		await field('Description 2.1').waitFor();
 		await page.keyboard.press('Escape'); // leave the new row's input
 		await expect.poll(total).toBe('€0.00');

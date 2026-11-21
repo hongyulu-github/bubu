@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { collapseAll, expandAll, toggleCollapsed, visibleRows } from '../budget/collapse';
-	import { describeConversion, type ConversionImpact } from '../budget/convert';
 	import { describeDeletion, type DeletionImpact } from '../budget/delete';
 	import { formatMoney } from '../budget/currency';
 	import { parseHistoryShortcut } from '../budget/shortcuts';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
 	import IconButton from '../components/IconButton.svelte';
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
-	import ConfirmConversionDialog from './ConfirmConversionDialog.svelte';
 	import ConfirmDeleteDialog from './ConfirmDeleteDialog.svelte';
 	import InlineTitle from './InlineTitle.svelte';
 
@@ -56,8 +54,6 @@
 	});
 	const mod = $derived(apple ? '⌘' : 'Ctrl+');
 	const shift = $derived(apple ? '⇧' : 'Shift+');
-	let confirmingConversion = $state(false);
-	let pendingConversion = $state<ConversionImpact | null>(null);
 	let confirmingDelete = $state(false);
 	let pendingDelete = $state<DeletionImpact | null>(null);
 	const ready = $derived(store.activeBudgetId === budgetId);
@@ -95,28 +91,11 @@
 		void focusAfterDelete();
 	}
 
-	async function addChildNow(parentId: string) {
+	async function addChild(parentId: string) {
 		// A new child must not land in a hidden row: open the Group it is added to.
 		if (collapsed.has(parentId)) collapsed = toggleCollapsed(collapsed, parentId);
 		const added = store.addChildItem(budgetId, parentId);
 		if (added.ok) await focusDescription(added.item.id);
-	}
-
-	/** Adding to a Group just adds. Adding to a Line converts it, so that is confirmed first. */
-	function requestAddChild(parentId: string) {
-		const conversion = describeConversion(store.itemsOf(budgetId), parentId);
-		if (!conversion) {
-			void addChildNow(parentId);
-			return;
-		}
-		pendingConversion = conversion;
-		confirmingConversion = true;
-	}
-
-	function confirmConversion() {
-		const parentId = pendingConversion?.parentId;
-		pendingConversion = null;
-		if (parentId) void addChildNow(parentId);
 	}
 
 	async function addTopLevel() {
@@ -162,7 +141,6 @@
 			{/if}
 		</header>
 
-		<ConfirmConversionDialog impact={pendingConversion} bind:open={confirmingConversion} onconfirm={confirmConversion} />
 		<ConfirmDeleteDialog impact={pendingDelete} bind:open={confirmingDelete} onconfirm={confirmDelete} />
 
 		{#if ready}
@@ -202,7 +180,7 @@
 					onedit={(itemId, field, text) => store.editItem(budgetId, itemId, field, text)}
 					onadd={addBelow}
 					ondelete={requestDelete}
-					onaddchild={requestAddChild}
+					onaddchild={addChild}
 					onnewitem={addTopLevel}
 				/>
 			</div>
