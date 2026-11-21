@@ -12,7 +12,8 @@
 		copy: 'M9 9h11v11H9zM5 15V5h10',
 		expandAll: 'm7 8 5-4 5 4M7 16l5 4 5-4',
 		collapseAll: 'm7 4 5 4 5-4M7 20l5-4 5 4',
-		check: 'm5 12 5 5 9-10'
+		check: 'm5 12 5 5 9-10',
+		download: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14'
 	} as const;
 
 	export type IconName = keyof typeof PATHS;

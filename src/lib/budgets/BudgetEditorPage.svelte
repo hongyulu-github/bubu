@@ -9,6 +9,8 @@
 	import BudgetSpreadsheet from './BudgetSpreadsheet.svelte';
 	import ConfirmConversionDialog from './ConfirmConversionDialog.svelte';
 	import type { ConversionImpact } from '../budget/convert';
+	import { exportBudget, exportFilename } from '../excel/export-budget';
+	import { saveBlob } from '../excel/template';
 	import { commitMove } from '../editor/move';
 	import type { DropRequest } from '../editor/drag';
 	import ConfirmDeleteDialog from './ConfirmDeleteDialog.svelte';
@@ -130,6 +132,18 @@
 		if (moved.ok && intent === 'inside' && collapsed.has(targetId)) collapsed = toggleCollapsed(collapsed, targetId);
 	}
 
+	let exportFailed = $state(false);
+
+	async function downloadExcel() {
+		exportFailed = false;
+		if (!budget) return;
+		try {
+			saveBlob(await exportBudget(budget, store.itemsOf(budgetId)), exportFilename(budget));
+		} catch {
+			exportFailed = true;
+		}
+	}
+
 	async function addTopLevel() {
 		const added = store.addTopLevelItem(budgetId);
 		if (added.ok) await focusDescription(added.item.id);
@@ -202,7 +216,13 @@
 						<IconButton icon="expandAll" label="Expand all" disabled={noneCollapsed} onclick={() => (collapsed = expandAll())} />
 					</div>
 				{/if}
+				<div class="group" role="group" aria-label="Export">
+					<IconButton icon="download" label="Download as Excel" onclick={downloadExcel} />
+				</div>
 			</div>
+			{#if exportFailed}
+				<p class="note" role="alert">The Excel file could not be created. Please try again.</p>
+			{/if}
 
 			<div class="table-area">
 				<BudgetSpreadsheet
