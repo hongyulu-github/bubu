@@ -61,7 +61,7 @@ describe('the Budgets drawer', () => {
 		expect(page.getByRole('button', { name: /new budget/i }).elements()).toHaveLength(0);
 	});
 
-	it('is a third of the window wide, but never narrower than the form needs, and fills a phone', async () => {
+	it('is 28rem wide on a desktop, pinned to the right edge', async () => {
 		const measure = async (width: number, height = 800) => {
 			await page.viewport(width, height);
 			const screen = render(Landing, { store: new BudgetStore({ history: new CommandHistory() }), navigate: vi.fn() });
@@ -74,10 +74,10 @@ describe('the Budgets drawer', () => {
 			return { rect, window };
 		};
 		const wide = await measure(1920);
-		expect(Math.abs(wide.rect.width - wide.window / 3)).toBeLessThanOrEqual(2); // a third
+		expect(wide.rect.width).toBe(448);
 		expect(Math.abs(wide.rect.right - wide.window)).toBeLessThanOrEqual(2); // pinned to the right edge
 		const laptop = await measure(1440);
-		expect(Math.abs(laptop.rect.width - laptop.window / 3)).toBeLessThanOrEqual(2);
+		expect(laptop.rect.width).toBe(448);
 		const narrow = await measure(1024); // a third would be too narrow for the form: the minimum
 		expect(narrow.rect.width).toBeCloseTo(28 * 16, 0);
 		const phone = await measure(390); // the whole width
@@ -148,8 +148,8 @@ describe('the Budgets drawer', () => {
 		for (const close of [
 			() => page.getByRole('button', { name: 'Close', exact: true }).click(),
 			() => userEvent.keyboard('{Escape}'),
-			// a click on the dimmed page: stdf draws that as a button laid over everything, just before the panel
-			async () => void (page.getByRole('dialog').element().closest('div.fixed')!.previousElementSibling as HTMLElement).click()
+			// a click on the dimmed page reaches the dialog element itself, at a point outside the panel
+			async () => void page.getByRole('dialog').element().dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 2, clientY: 2 }))
 		]) {
 			await mine().click();
 		await settled();

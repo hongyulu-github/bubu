@@ -1,6 +1,6 @@
 /*
- * BuBu design tokens. The colours are the stdf "Starbucks" theme's palette (green and warm neutrals), read from the
- * variables that data-theme="Starbucks" on <html> defines; type, radius and spacing are the app's own scale.
+ * BuBu design tokens. The colours are the app's palette (green and warm neutrals), read from the variables that
+ * theme.css defines on <html>; type, radius and spacing are the app's own scale.
  * Dark values apply with the OS setting (prefers-color-scheme) unless data-appearance="light" is set
  * on <html>; data-appearance="dark" forces dark. There is deliberately no in-app theme switch.
  * Contrast (WCAG): text pairs >= 4.5:1, control borders >= 3:1 in both themes.
@@ -8,8 +8,8 @@
 :root {
 	color-scheme: light dark;
 
-	/* Colour: every value comes from the stdf Starbucks palette (the --color-primary, --color-bg-*,
-	   --color-text-* variables that data-theme="Starbucks" sets on <html>), never a hard-coded hex. */
+	/* Colour: every value comes from the palette in theme.css (the --color-primary, --color-bg-*,
+	   --color-text-* variables), never a hard-coded hex. */
 	--color-bg: var(--color-bg-base);
 	--color-surface: var(--color-bg-surface);
 	--color-text: var(--color-text-primary);
@@ -65,13 +65,12 @@
 	--line-height-tight: 1.25;
 	--line-height-body: 1.5;
 
-	/* One radius scale for everything: icon buttons and chips, buttons and fields and menu items, cards
-	   and menus and the table, dialogs. Nested shapes step down one level (concentric corners). */
-	--radius-sm: 6px;
-	--radius-md: 10px;
-	--radius-lg: 14px;
-	--radius-xl: 20px;
-	--radius-full: 999px;
+	/* Square corners everywhere. The scale is kept so a radius can come back in one place. */
+	--radius-sm: 0;
+	--radius-md: 0;
+	--radius-lg: 0;
+	--radius-xl: 0;
+	--radius-full: 0;
 
 	/* Controls and motion */
 	--control-height: 2rem; /* 32px: desktop default is 28pt, with room for the focus ring */

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { HTMLSelectAttributes } from 'svelte/elements';
+	import { ChevronDownOutline } from 'flowbite-svelte-icons';
+	import { Helper, Label, Select as FlowbiteSelect } from 'flowbite-svelte';
 
-	interface Props extends Omit<HTMLSelectAttributes, 'value' | 'id' | 'children'> {
+	interface Props extends Omit<HTMLSelectAttributes, 'value' | 'id' | 'children' | 'class'> {
 		/** Visible label; always rendered so the field has an accessible name. */
 		label: string;
 		value?: string;
@@ -19,16 +21,19 @@
 	const messageId = `${id}-message`;
 </script>
 
-<div class="field">
-	<label for={id}>{label}</label>
-	<div class="control">
-	<select
+<!-- Flowbite's Label, Select and Helper are the field: a real <label for>, a native <select> that carries aria-invalid and aria-describedby, and the hint and polite message below. The options are written out so the empty first option stays selectable. -->
+<div class="flex flex-col gap-1">
+	<Label for={id}>{label}</Label>
+	<div class="relative">
+	<FlowbiteSelect
 		{id}
 		bind:value
-		{disabled}
+		disabled={disabled ?? false}
+		color={error ? 'red' : 'default'}
+		classes={{ select: "border-gray-500 appearance-none pe-10 dark:border-gray-400" }}
 		aria-invalid={error ? 'true' : undefined}
 		aria-describedby={[hint ? hintId : '', messageId].filter(Boolean).join(' ')}
-		{...rest}
+		{...rest as Record<string, unknown>}
 	>
 		{#if placeholder !== undefined}
 			<option value="">{placeholder}</option>
@@ -36,95 +41,11 @@
 		{#each options as option (option.value)}
 			<option value={option.value}>{option.label}</option>
 		{/each}
-	</select>
-	<span class="chevron" aria-hidden="true"></span>
+	</FlowbiteSelect>
+	<ChevronDownOutline class="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-gray-500 dark:text-gray-400" aria-hidden="true" />
 	</div>
 	{#if hint}
-		<p class="hint" id={hintId}>{hint}</p>
+		<Helper id={hintId}>{hint}</Helper>
 	{/if}
-	<p class="error" id={messageId} aria-live="polite">{error ?? ''}</p>
+	<Helper id={messageId} color="red" aria-live="polite" class="empty:hidden">{error ?? ''}</Helper>
 </div>
-
-<style>
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-
-	label {
-		font-size: var(--font-size-callout);
-		font-weight: var(--font-weight-semibold);
-		color: var(--color-text);
-	}
-
-	.control {
-		position: relative;
-		display: flex;
-	}
-
-	/* Same look as Input: surface fill, one border, the shared radius; the platform arrow is replaced. */
-	select {
-		appearance: none;
-		width: 100%;
-		min-height: var(--control-height);
-		padding: 0 calc(var(--space-3) + 1.5rem) 0 var(--space-3);
-		border: 1px solid var(--color-border-strong);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		color: var(--color-text);
-		font: inherit;
-		cursor: pointer;
-	}
-
-	.chevron {
-		position: absolute;
-		inset-block: 0;
-		inset-inline-end: var(--space-3);
-		width: 0.45rem;
-		height: 0.45rem;
-		margin-block: auto;
-		border-right: 2px solid var(--color-text-secondary);
-		border-bottom: 2px solid var(--color-text-secondary);
-		transform: translateY(-25%) rotate(45deg);
-		pointer-events: none;
-	}
-
-	select:focus-visible {
-		outline: var(--focus-ring-width) solid var(--color-focus-ring);
-		outline-offset: var(--focus-ring-offset);
-	}
-
-	select[aria-invalid='true'] {
-		border-color: var(--color-danger);
-	}
-
-	select:disabled ~ .chevron {
-		border-color: var(--color-disabled-text);
-	}
-
-	select:disabled {
-		background: var(--color-disabled-bg);
-		color: var(--color-disabled-text);
-		border-color: transparent;
-		cursor: not-allowed;
-	}
-
-	.hint,
-	.error {
-		margin: 0;
-		font-size: var(--font-size-footnote);
-	}
-
-	.hint {
-		color: var(--color-text-secondary);
-	}
-
-	.error {
-		color: var(--color-danger);
-	}
-
-	.error:empty {
-		display: none;
-	}
-</style>

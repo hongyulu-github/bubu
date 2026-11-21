@@ -10,7 +10,7 @@ export function resetTheme() {
 
 let canvas: CanvasRenderingContext2D | undefined;
 
-/** Computed colours may be `oklch(...)` (stdf themes); a 1px canvas turns any CSS colour into sRGB. */
+/** Computed colours may be `oklch(...)` (the theme's palette); a 1px canvas turns any CSS colour into sRGB. */
 function toRgb(value: string): string {
 	if (value.startsWith('rgb')) return value;
 	canvas ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;

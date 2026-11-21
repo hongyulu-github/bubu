@@ -6,8 +6,9 @@ import { focusDocument } from '../testing/theme';
 import IconButton from './IconButton.svelte';
 
 const button = (name = 'Undo') => page.getByRole('button', { name });
-const tip = () => document.querySelector<HTMLElement>('.tip')!;
-const tipShown = () => tip().matches(':popover-open');
+// Flowbite's Tooltip: a popover with role "tooltip", which exists only while it is shown.
+const tip = () => document.querySelector<HTMLElement>('[role="tooltip"]:popover-open');
+const tipShown = () => tip() !== null;
 
 describe('IconButton', () => {
 	it('is an icon with an accessible name, not a text button', async () => {
@@ -42,12 +43,12 @@ describe('IconButton', () => {
 		await focusDocument(page);
 		await userEvent.tab();
 		await vi.waitFor(() => expect(tipShown()).toBe(true));
-		expect(tip().textContent).toContain('Undo');
-		expect(tip().textContent).toContain('⌘Z');
-		expect(tip().getAttribute('aria-hidden')).toBe('true'); // the name is on the button: no double announcement
+		expect(tip()!.textContent).toContain('Undo');
+		expect(tip()!.textContent).toContain('⌘Z');
+		expect(button().element().getAttribute('aria-describedby')).toBeNull(); // the name is on the button: no double announcement
 
 		await userEvent.keyboard('{Escape}');
-		expect(tipShown()).toBe(false);
+		await vi.waitFor(() => expect(tipShown()).toBe(false)); // it fades out first
 	});
 
 	it('shows the tooltip on hover after a short delay and hides it on leaving', async () => {
@@ -64,7 +65,7 @@ describe('IconButton', () => {
 		render(IconButton, { icon: 'undo', label: 'Undo' });
 		await button().hover();
 		await vi.waitFor(() => expect(tipShown()).toBe(true));
-		const box = tip().getBoundingClientRect();
+		const box = tip()!.getBoundingClientRect();
 		expect(box.left).toBeGreaterThanOrEqual(0);
 		expect(box.right).toBeLessThanOrEqual(window.innerWidth);
 		expect(box.top).toBeGreaterThanOrEqual(0);

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { HTMLTdAttributes } from 'svelte/elements';
+	import { TableBodyCell, TableHeadCell } from 'flowbite-svelte';
 
-	interface Props extends Omit<HTMLTdAttributes, 'children'> {
+	interface Props extends Omit<HTMLTdAttributes, 'children' | 'class'> {
 		/** Render a `<th>` (column or row header) instead of a `<td>`. */
 		header?: boolean;
 		scope?: 'col' | 'row';
@@ -29,80 +30,47 @@
 		strong = false,
 		depth = 0,
 		children,
+		style = '',
 		...rest
 	}: Props = $props();
+
+	const cellClass = $derived([
+		'cell cursor-text border-b border-gray-200 px-3 py-1 whitespace-normal bg-(--row-tint) dark:border-gray-700',
+		header && 'cursor-default',
+		numeric && 'text-end tabular-nums',
+		readonly && 'cursor-default text-gray-500 dark:text-gray-400',
+		strong && 'font-semibold',
+		selected && 'selected [background-image:linear-gradient(var(--color-selected),var(--color-selected))]',
+		invalid && 'shadow-[inset_0_-2px_0] shadow-red-600',
+		'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-600'
+	]);
 </script>
 
-<svelte:element
-	this={header ? 'th' : 'td'}
-	class="cell"
-	class:numeric
-	class:selected
-	class:invalid
-	class:readonly
-	class:strong
-	data-readonly={readonly ? '' : undefined}
-	style:--cell-depth={depth}
-	scope={header ? (scope ?? 'col') : undefined}
-	aria-selected={selected && rest.tabindex !== undefined ? true : undefined}
-	aria-invalid={invalid ? 'true' : undefined}
-	{...rest}
->
+{#snippet content()}
 	{@render children()}
-</svelte:element>
+{/snippet}
 
-<style>
-	.cell {
-		padding: var(--space-1) var(--space-3);
-		padding-inline-start: calc(var(--space-3) + min(var(--cell-depth, 0) * var(--space-4), 12rem));
-		border-bottom: 1px solid var(--color-border);
-		font-size: var(--font-size-callout);
-		text-align: start;
-		font-weight: var(--font-weight-regular);
-		color: var(--color-text);
-		/* Group rows set --row-tint; everything else shares one background. */
-		background-color: var(--row-tint, transparent);
-		cursor: text; /* editable by default: the cursor is part of telling editable from read-only */
-	}
-
-	th.cell {
-		cursor: default;
-		font-size: var(--font-size-footnote);
-		font-weight: var(--font-weight-semibold);
-		letter-spacing: 0.01em;
-		color: var(--color-text-secondary);
-	}
-
-	.numeric {
-		text-align: end;
-		font-variant-numeric: tabular-nums;
-	}
-
-	/* Read-only values are told apart by a muted colour and a plain cursor, not by a fill. */
-	.readonly {
-		color: var(--color-text-secondary);
-		cursor: default;
-	}
-
-	.readonly.strong {
-		color: var(--color-text);
-	}
-
-	.strong {
-		font-weight: var(--font-weight-semibold);
-	}
-
-	/* Overlays, so a Group's tint still shows underneath. */
-	.selected {
-		background-image: linear-gradient(var(--color-selected), var(--color-selected));
-	}
-
-	.invalid {
-		box-shadow: inset 0 -2px 0 var(--color-danger);
-	}
-
-	.cell:focus-visible {
-		outline: var(--focus-ring-width) solid var(--color-focus-ring);
-		outline-offset: calc(var(--focus-ring-width) * -1);
-	}
-</style>
+<!-- Flowbite's TableHeadCell and TableBodyCell are the <th> and <td>, with every attribute passed through (data-cell, tabindex, aria-*). -->
+{#if header}
+	<TableHeadCell
+		{...rest as Record<string, unknown>}
+		class={cellClass}
+		style="padding-inline-start: calc(0.75rem + min({depth} * 1rem, 12rem));{style}"
+		scope={scope ?? 'col'}
+		data-readonly={readonly ? '' : undefined}
+		aria-invalid={invalid ? 'true' : undefined}
+	>
+		{@render content()}
+	</TableHeadCell>
+{:else}
+	<TableBodyCell
+		{...rest as Record<string, unknown>}
+		class={cellClass}
+		style="padding-inline-start: calc(0.75rem + min({depth} * 1rem, 12rem));{style}"
+		data-readonly={readonly ? '' : undefined}
+		aria-selected={selected && rest.tabindex !== undefined ? true : undefined}
+		aria-invalid={invalid ? 'true' : undefined}
+	>
+		{@render content()}
+	</TableBodyCell>
+{/if}

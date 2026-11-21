@@ -102,7 +102,7 @@ describe('moving rows by pointer', () => {
 		render(BudgetEditorPage, { budgetId: A, store });
 
 		await drop(4, 1, INSIDE); // into the existing Group 1: no warning
-		expect(document.querySelector('[role="dialog"]')).toBeNull();
+		expect(document.querySelector('dialog[open]')).toBeNull();
 		expect(byId(store, 4).parentId).toBe(uuid(1));
 		await drop(2, 7, AFTER); // 2 up to the top level, after Music
 		expect(byId(store, 2).parentId).toBeNull();
@@ -202,7 +202,7 @@ describe('moving rows by pointer', () => {
 		await drop(1, 2, INSIDE); // Group 1 into its own child
 		await drop(1, 3, AFTER);
 		await drop(5, 7, BEFORE); // 5 is already just before 7
-		expect(document.querySelector('[role="dialog"]')).toBeNull();
+		expect(document.querySelector('dialog[open]')).toBeNull();
 		expect(itemsOf(store)).toBe(before);
 		expect(store.canUndo(A)).toBe(false);
 		expect(saved()).toBe(untouched);

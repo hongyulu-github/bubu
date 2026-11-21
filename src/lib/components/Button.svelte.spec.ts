@@ -37,8 +37,8 @@ describe('Button', () => {
 		await userEvent.tab();
 
 		const style = getComputedStyle(page.getByRole('button', { name: 'Save' }).element());
-		expect(style.outlineStyle).toBe('solid');
-		expect(parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2);
+		// Flowbite shows focus as a ring (a box shadow), not an outline.
+		expect(style.boxShadow).not.toBe('none');
 	});
 
 	it('keeps readable contrast for every variant', async () => {

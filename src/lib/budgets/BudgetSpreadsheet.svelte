@@ -369,7 +369,7 @@
 			{#if onnewitem}
 				<tr class="new-row">
 					<td colspan={columnCount}>
-						<button type="button" class="new-item" data-add-item onclick={onnewitem}>
+						<button type="button" class="new-item" data-add-item data-focus-fallback onclick={onnewitem}>
 							<Icon name="plus" />
 							<span>New item</span>
 						</button>

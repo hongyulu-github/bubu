@@ -38,15 +38,15 @@ describe('ExcelJS in the built static site', () => {
 
 	it('does not load ExcelJS until a workbook is needed', async () => {
 		const page = await (await browser.newContext()).newPage();
-		const sizes: Promise<number>[] = [];
+		const scripts: Promise<string>[] = [];
 		page.on('response', (response) => {
-			if (response.url().endsWith('.js')) sizes.push(response.body().then((body) => body.length));
+			if (response.url().endsWith('.js')) scripts.push(response.text());
 		});
 		await page.goto(`${baseUrl}/budgets`);
 		await page.waitForLoadState('networkidle');
-		const bytes = (await Promise.all(sizes)).reduce((sum, size) => sum + size, 0);
-		expect(bytes).toBeGreaterThan(0);
-		expect(bytes).toBeLessThan(800_000); // the ~900 kB ExcelJS chunk is not among the app's start-up files
+		const loaded = await Promise.all(scripts);
+		expect(loaded.length).toBeGreaterThan(0);
+		expect(loaded.some((code) => code.includes('lastModifiedBy'))).toBe(false); // the ~900 kB ExcelJS chunk is not among the start-up files
 		await page.context().close();
 	});
 

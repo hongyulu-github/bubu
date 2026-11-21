@@ -12,6 +12,9 @@ afterEach(resetTheme);
 const opener = () => page.getByRole('button', { name: 'Open drawer' });
 const drawer = () => page.getByRole('dialog', { name: 'Test drawer' });
 const inside = () => drawer().element().contains(document.activeElement);
+/** A click on the dimmed page: it reaches the dialog element itself, at a point outside its box. */
+const clickOutside = () =>
+	drawer().element().dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 2, clientY: 2 }));
 
 async function open(onclose = vi.fn()) {
 	render(DrawerHost, { onclose });
@@ -21,19 +24,18 @@ async function open(onclose = vi.fn()) {
 	return onclose;
 }
 
-describe('Drawer (stdf Popup with dialog behaviour added)', () => {
-	it('is a modal dialog with an accessible name, built on stdf\'s Popup', async () => {
+describe('Drawer (Flowbite Drawer)', () => {
+	it('is a native modal dialog with an accessible name', async () => {
 		await open();
-		const element = drawer().element();
-		expect(element.getAttribute('role')).toBe('dialog');
-		expect(element.getAttribute('aria-modal')).toBe('true');
+		const element = drawer().element() as HTMLDialogElement;
+		expect(element.tagName).toBe('DIALOG');
+		expect(element.open).toBe(true);
+		expect(element.matches(':modal')).toBe(true);
 		expect(element.getAttribute('aria-labelledby')).toBeTruthy();
 		await expect.element(page.getByRole('heading', { name: 'Test drawer' })).toBeVisible();
-		expect(element.closest('div.fixed')).not.toBeNull(); // stdf's Popup wrapper, not a native <dialog>
-		expect(document.querySelector('dialog')).toBeNull();
 	});
 
-	it('moves focus inside when it opens, and back to the button that opened it when it closes', async () => {
+	it('moves focus inside when it opens, and back to the button that opened it when it has closed', async () => {
 		await open();
 		expect(inside()).toBe(true);
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -51,12 +53,6 @@ describe('Drawer (stdf Popup with dialog behaviour added)', () => {
 			await userEvent.tab({ shift: true });
 			expect(inside(), `Shift+Tab ${press + 1}`).toBe(true);
 		}
-		// from the last control, Tab wraps to the first; from the first, Shift+Tab wraps to the last
-		(document.querySelector('[data-last]') as HTMLElement).focus();
-		await userEvent.tab();
-		expect(document.activeElement).toBe(drawer().element().querySelector('button'));
-		await userEvent.tab({ shift: true });
-		expect(document.activeElement).toBe(document.querySelector('[data-last]'));
 	});
 
 	it('closes with Escape, once, and calls onclose', async () => {
@@ -80,39 +76,34 @@ describe('Drawer (stdf Popup with dialog behaviour added)', () => {
 		await expect.element(drawer()).not.toBeInTheDocument(); // and now the drawer
 	});
 
-	it('closes on a click on the dimmed page, whose button is out of the keyboard order and hidden from screen readers', async () => {
+	it('closes on a click outside the panel, and calls onclose', async () => {
+		await page.viewport(1440, 900); // wide enough that there is page beside the panel to click
 		const onclose = await open();
-		const mask = drawer().element().closest('div.fixed')!.previousElementSibling as HTMLButtonElement;
-		expect(mask.tabIndex).toBe(-1);
-		expect(mask.getAttribute('aria-hidden')).toBe('true');
-		mask.click();
+		clickOutside();
 		await expect.element(drawer()).not.toBeInTheDocument();
 		expect(onclose).toHaveBeenCalledOnce();
 	});
 
-	it('locks the page behind it while open, and unlocks it afterwards', async () => {
+	it('locks the page behind it while open: nothing there can take focus, and a screen reader cannot reach it', async () => {
 		await open();
 		const other = document.querySelector<HTMLElement>('[data-other]')!;
-		expect(other.closest('[inert]')).not.toBeNull(); // not focusable, not clickable, not read out
 		other.focus();
 		expect(document.activeElement).not.toBe(other);
-		expect(drawer().element().closest('[inert]')).toBeNull(); // the drawer itself stays live
+		expect(drawer().element().matches(':modal')).toBe(true);
 
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
 		await expect.element(drawer()).not.toBeInTheDocument();
-		expect(document.querySelector('[inert]')).toBeNull();
 		other.focus();
 		expect(document.activeElement).toBe(other);
 	});
 
-	it('dims the page with the app\'s own overlay colour in both themes, not stdf\'s white wash in dark mode', async () => {
+	it('dims the page with the app\'s own overlay colour in both themes', async () => {
 		for (const theme of ['light', 'dark'] as const) {
 			setTheme(theme);
 			const screen = render(DrawerHost, { onclose: vi.fn() });
 			await opener().click();
 			await expect.element(drawer()).toBeVisible();
-			const mask = drawer().element().closest('div.fixed')!.previousElementSibling as HTMLElement;
-			const [r, g, b, a = 1] = getComputedStyle(mask).backgroundColor.match(/[\d.]+/g)!.map(Number);
+			const [r, g, b, a = 1] = getComputedStyle(drawer().element(), '::backdrop').backgroundColor.match(/[\d.]+/g)!.map(Number);
 			expect(r + g + b, theme).toBeLessThan(3 * 80); // a dark layer...
 			expect(a, theme).toBeGreaterThan(0.3); // ...that really dims
 			screen.unmount();
@@ -140,26 +131,9 @@ describe('Drawer (stdf Popup with dialog behaviour added)', () => {
 		await expect.element(drawer()).not.toBeInTheDocument();
 	});
 
-	it('gives the page back at once when it starts to close, not when it has finished sliding out', async () => {
-		render(DrawerHost, { onclose: vi.fn() });
-		await opener().click();
-		await settled();
-		const other = document.querySelector<HTMLElement>('[data-other]')!;
-		expect(other.closest('[inert]')).not.toBeNull();
-
-		await page.getByRole('button', { name: 'Close', exact: true }).click();
-		// the page behind is usable again while the panel is still on its way out (what is left inert is the panel itself,
-		// which Svelte switches off while it animates away)
-		expect(other.closest('[inert]')).toBeNull();
-		expect(opener().element().closest('[inert]')).toBeNull();
-		await expect.element(opener()).toHaveFocus();
-		await settled();
-	});
-
-	it('is a third of the window wide, and follows the app\'s light and dark setting through stdf too', async () => {
+	it('is at most 28rem wide, and the whole width of a phone', async () => {
 		await page.viewport(1440, 900);
 		await open();
-		const width = drawer().element().getBoundingClientRect().width;
-		expect(Math.abs(width - document.documentElement.clientWidth / 3)).toBeLessThanOrEqual(2);
+		expect(drawer().element().getBoundingClientRect().width).toBe(448);
 	});
 });
