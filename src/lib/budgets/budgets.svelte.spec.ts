@@ -7,6 +7,7 @@ import { createBudget, createItem, type Item } from '../budget/model';
 import { CommandHistory } from '../history/commands';
 import { bubuStorage, budgetKey, createBubuStorage } from '../storage/bubu';
 import { BudgetStore } from '../state/budgets.svelte';
+import { BudgetPersistence } from '../state/persistence.svelte';
 import BudgetEditorPage from './BudgetEditorPage.svelte';
 import BudgetsList from './BudgetsList.svelte';
 
@@ -281,6 +282,104 @@ describe('BudgetsList', () => {
 		await choose('Delete', 'Wedding');
 		await page.getByRole('dialog').getByRole('button', { name: 'Delete Budget' }).click();
 		expect(JSON.stringify({ ...localStorage })).toBe(before);
+	});
+
+	describe('Clear all BuBu data', () => {
+		const open = async () => {
+			await page.getByRole('button', { name: 'More actions' }).click();
+			await page.getByRole('menuitem', { name: 'Clear all BuBu data…' }).click();
+		};
+		const confirm = () => page.getByRole('dialog').getByRole('button', { name: 'Clear all BuBu data' }).click();
+		const keep = () => {
+			localStorage.setItem('other-app:settings', '{"theme":"dark"}');
+			localStorage.setItem('unrelated', 'x');
+		};
+
+		it('is a destructive item in a "⋯" menu beside New Budget, not a button on the page', async () => {
+			seed();
+			render(BudgetsList, { store: newStore() });
+			expect(document.querySelector('main > footer')).toBeNull();
+			await expect.element(page.getByRole('button', { name: 'Clear all BuBu data' })).not.toBeInTheDocument();
+			await page.getByRole('button', { name: 'More actions' }).click();
+			await expect.element(page.getByRole('menuitem', { name: 'Clear all BuBu data…' })).toBeVisible();
+		});
+
+		it('is hidden when there are no Budgets to clear, and appears with the first one', async () => {
+			const store = newStore();
+			render(BudgetsList, { store });
+			await expect.element(page.getByText('No saved Budgets yet.')).toBeVisible();
+			await expect.element(page.getByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
+
+			store.createBudget({ name: 'Fresh', currency: 'EUR' });
+			await expect.element(page.getByRole('button', { name: 'More actions' })).toBeVisible();
+		});
+
+		it('asks first, in strong words: all Budgets are removed, it cannot be undone', async () => {
+			seed();
+			render(BudgetsList, { store: newStore() });
+			await open();
+			const dialog = page.getByRole('dialog', { name: 'Clear all BuBu data?' });
+			await expect.element(dialog).toBeVisible();
+			await expect.element(dialog).toHaveTextContent('all 2 of your Budgets');
+			await expect.element(dialog).toHaveTextContent('cannot be undone');
+			await expect.element(dialog).toHaveTextContent('Anything else saved in your browser is left alone');
+		});
+
+		it('on Cancel or Escape changes nothing: storage, state and history stay', async () => {
+			seed();
+			keep();
+			const store = newStore();
+			render(BudgetsList, { store });
+			store.editItem(A, `00000000-0000-4000-8000-${(101).toString().padStart(12, '0')}`, 'description', 'edited');
+			const before = JSON.stringify({ ...localStorage });
+			const budgets = store.budgets;
+
+			await open();
+			await page.getByRole('button', { name: 'Cancel' }).click();
+			await open();
+			await userEvent.keyboard('{Escape}');
+
+			await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+			expect(JSON.stringify({ ...localStorage })).toBe(before);
+			expect(store.budgets).toBe(budgets);
+			expect(store.canUndo(A)).toBe(true);
+			expect(document.querySelectorAll('main ul li')).toHaveLength(2);
+		});
+
+		it('on confirm removes only bubu: keys, leaves the other keys byte for byte, and shows the empty state', async () => {
+			seed();
+			keep();
+			const store = newStore();
+			const stopAutosave = new BudgetPersistence(store).start(); // as the app layout does: it must not write anything back
+			render(BudgetsList, { store });
+			store.editItem(A, `00000000-0000-4000-8000-${(101).toString().padStart(12, '0')}`, 'description', 'edited');
+
+			await open();
+			await confirm();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			stopAutosave();
+
+			await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+			expect(Object.keys(localStorage).sort()).toEqual(['other-app:settings', 'unrelated']);
+			expect(localStorage.getItem('other-app:settings')).toBe('{"theme":"dark"}');
+			expect(localStorage.getItem('unrelated')).toBe('x');
+			await expect.element(page.getByText('No saved Budgets yet.')).toBeVisible();
+			await expect.element(page.getByRole('button', { name: 'More actions' })).not.toBeInTheDocument(); // nothing left to clear
+			expect(document.querySelectorAll('main ul li')).toHaveLength(0);
+			expect(store.budgets).toEqual([]);
+			expect(store.canUndo(A)).toBe(false); // no stale history can bring a cleared Budget back
+			await expect.element(page.getByRole('status')).toHaveTextContent('All BuBu data was cleared.');
+			await expect.element(page.getByRole('link', { name: 'New Budget' })).toBeVisible(); // still usable
+		});
+
+		it('shows the editor of a cleared Budget as not found', async () => {
+			seed();
+			const store = newStore();
+			render(BudgetEditorPage, { budgetId: A, store });
+			await expect.element(page.getByRole('heading', { name: 'Wedding' })).toBeVisible();
+			store.clearAll();
+			await expect.element(page.getByRole('heading', { name: 'Budget not found' })).toBeVisible();
+		});
 	});
 
 	it('gives every Budget its own "⋯" menu button, named for the Budget', async () => {

@@ -294,4 +294,19 @@ describe('session-only memory', () => {
 		}
 		expect(accesses).toBe(0);
 	});
+
+	it('clearAll discards every Budget\'s undo and redo stacks', () => {
+		const history = new CommandHistory();
+		history.execute(BUDGET_A, { before: s0, after: s1 });
+		history.execute(BUDGET_B, { before: s0, after: s1 });
+		history.undo(BUDGET_B);
+
+		history.clearAll();
+
+		for (const id of [BUDGET_A, BUDGET_B]) {
+			expect(history.canUndo(id)).toBe(false);
+			expect(history.canRedo(id)).toBe(false);
+			expect(history.undo(id)).toBeNull();
+		}
+	});
 });

@@ -65,6 +65,7 @@ export type DuplicateBudgetResult =
 	| { ok: false; reason: 'unknown-budget' }
 	| { ok: false; reason: 'invalid'; issues: ValidationIssue[] };
 
+export type ClearAllResult = { ok: true } | { ok: false; error: StorageError };
 export type DeleteBudgetResult = { ok: true } | { ok: false; reason: 'unknown-budget' };
 
 export type RenameBudgetResult =
@@ -232,6 +233,24 @@ export class BudgetStore {
 
 		this.setBudget(copy.budget, copy.items);
 		return { ok: true, budget: copy.budget };
+	}
+
+	/**
+	 * Remove every BuBu Budget: the `bubu:` keys in browser storage (through the storage module, so
+	 * nothing else in localStorage is touched), the Budgets and Items in memory, and every undo history.
+	 * Storage is cleared first; if that fails nothing changes. Not an Item command: it cannot be undone.
+	 * The caller confirms first. The autosave path then sees an empty state and writes nothing.
+	 */
+	clearAll(): ClearAllResult {
+		const cleared = this.#storage.clearAll();
+		if (!cleared.ok) return { ok: false, error: cleared.error };
+		this.budgets = [];
+		this.#itemsByBudget = {};
+		this.activeBudgetId = null;
+		this.loadIssues = [];
+		this.#history.clearAll();
+		this.#historyVersion++;
+		return { ok: true };
 	}
 
 	/**

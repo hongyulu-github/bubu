@@ -6,6 +6,7 @@
 	import MoreMenu from '../components/MoreMenu.svelte';
 	import type { Budget } from '../budget/model';
 	import { budgetStore, type BudgetStore } from '../state/budgets.svelte';
+	import ConfirmClearDataDialog from './ConfirmClearDataDialog.svelte';
 	import ConfirmDeleteBudgetDialog from './ConfirmDeleteBudgetDialog.svelte';
 	import RenameBudgetDialog from './RenameBudgetDialog.svelte';
 
@@ -36,6 +37,19 @@
 		// The deleted row (and the button that opened the dialog) is gone; land on a stable control.
 		await tick();
 		document.querySelector<HTMLElement>('[data-new-budget]')?.focus();
+	}
+
+	let confirmingClear = $state(false);
+
+	// Rare and permanent, so it lives in the "⋯" menu (destructive item, red, with an ellipsis because it asks
+	// again) and not as a button on the page; the dialog is the real confirmation.
+	const pageActions: MenuItem[] = [
+		{ id: 'clear', label: 'Clear all BuBu data…', icon: 'trash', destructive: true, onselect: () => (confirmingClear = true) }
+	];
+
+	function confirmClear() {
+		const result = store.clearAll();
+		message = result.ok ? 'All BuBu data was cleared.' : 'BuBu data could not be cleared.';
 	}
 
 	/** Copy a Budget, then move focus to the copy so keyboard users land on what was made. */
@@ -96,7 +110,12 @@
 <main>
 	<header>
 		<h1>Your Budgets</h1>
-		<a class="new" href="/budgets/new" data-new-budget>New Budget</a>
+		<div class="bar">
+			<a class="new" href="/budgets/new" data-new-budget>New Budget</a>
+			{#if store.hydrationStatus === 'ready' && store.budgets.length > 0}
+				<MoreMenu label="More actions" items={pageActions} />
+			{/if}
+		</div>
 	</header>
 
 	{#if store.hydrationStatus === 'idle'}
@@ -143,6 +162,8 @@
 			</ul>
 		{/if}
 
+		<ConfirmClearDataDialog budgetCount={store.budgets.length} bind:open={confirmingClear} onconfirm={confirmClear} />
+
 		{#if renamingId}
 			<RenameBudgetDialog budgetId={renamingId} bind:open={renaming} {store} />
 		{/if}
@@ -172,6 +193,12 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-4);
+	}
+
+	.bar {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
 	}
 
 	h1 {

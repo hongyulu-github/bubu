@@ -70,6 +70,11 @@ export class CommandHistory {
 		this.#stacks.delete(budgetId);
 	}
 
+	/** Discard every Budget's stacks, e.g. when all BuBu data is cleared, so nothing can be undone into a Budget that is gone. */
+	clearAll(): void {
+		this.#stacks.clear();
+	}
+
 	canUndo(budgetId: Uuid): boolean {
 		return (this.#stacks.get(budgetId)?.undo.length ?? 0) > 0;
 	}

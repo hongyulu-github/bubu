@@ -531,6 +531,86 @@ describe('adding Items', () => {
 	});
 });
 
+describe('clearAll', () => {
+	function openTwo() {
+		seedStorage();
+		bubuStorage.writeItems(B, [item(B, 1, null, '100')]);
+		const store = newStore();
+		store.hydrate();
+		return store;
+	}
+
+	it('removes every bubu: key and nothing else, byte for byte', () => {
+		localStorage.setItem('other-app:settings', '{"theme":"dark"}');
+		localStorage.setItem('bubu', 'no colon');
+		localStorage.setItem('unrelated', 'x');
+		const store = openTwo();
+
+		expect(store.clearAll()).toEqual({ ok: true });
+
+		expect(Object.keys(localStorage).sort()).toEqual(['bubu', 'other-app:settings', 'unrelated']);
+		expect(localStorage.getItem('other-app:settings')).toBe('{"theme":"dark"}');
+		expect(localStorage.getItem('bubu')).toBe('no colon');
+	});
+
+	it('also removes data that could not be loaded, since it is BuBu data too', () => {
+		localStorage.setItem(budgetKey(A), '{broken');
+		const store = newStore();
+		store.hydrate();
+		expect(store.loadIssues.length).toBeGreaterThan(0);
+
+		store.clearAll();
+		expect(localStorage.getItem(budgetKey(A))).toBeNull();
+		expect(store.loadIssues).toEqual([]);
+	});
+
+	it('resets the state to a usable empty one', () => {
+		const store = openTwo();
+		store.select(A);
+
+		store.clearAll();
+
+		expect(store.budgets).toEqual([]);
+		expect(store.activeBudget).toBeNull();
+		expect(store.itemsOf(A)).toEqual([]);
+		expect(store.rows).toEqual([]);
+		expect(store.hydrationStatus).toBe('ready');
+		const created = store.createBudget({ name: 'Fresh', currency: 'EUR' });
+		expect(created.ok).toBe(true); // still usable
+		expect(store.budgets).toHaveLength(1);
+	});
+
+	it('leaves no history to restore cleared Budgets, for every Budget, even when it comes back with the same id', () => {
+		const store = openTwo();
+		store.editItem(A, uuid(3), 'quantity', '2');
+		store.editItem(B, uuid(1), 'description', 'edited');
+
+		store.clearAll();
+
+		expect(store.canUndo(A)).toBe(false);
+		expect(store.canUndo(B)).toBe(false);
+		expect(store.undo(A)).toBe(false);
+		store.setBudget(budget(A, 'Back again'), []);
+		expect(store.undo(A)).toBe(false);
+		expect(store.itemsOf(A)).toEqual([]);
+	});
+
+	it('changes nothing when storage cannot be cleared', () => {
+		seedStorage();
+		const failing = { ...bubuStorage, clearAll: () => ({ ok: false as const, error: { kind: 'write-failed' as const, message: 'blocked' } }) };
+		const store = newStore({ storage: failing });
+		store.hydrate();
+		store.editItem(A, uuid(3), 'quantity', '2');
+		const budgets = store.budgets;
+
+		expect(store.clearAll()).toMatchObject({ ok: false, error: { kind: 'write-failed' } });
+
+		expect(store.budgets).toBe(budgets);
+		expect(store.canUndo(A)).toBe(true);
+		expect(localStorage.getItem(budgetKey(A))).not.toBeNull();
+	});
+});
+
 describe('deleteBudget', () => {
 	function openTwo() {
 		seedStorage();
