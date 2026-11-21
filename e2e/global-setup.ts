@@ -30,6 +30,12 @@ function fileFor(pathname: string): string | null {
 
 /** Build the static site, then serve `build/` the way production hosting will (clean URLs + SPA fallback). */
 export default async function setup(project: TestProject) {
+	// `SMOKE_URL=https://… npm run smoke` runs the smoke test against a deployed site: nothing is built or served here.
+	if (process.env.SMOKE_URL) {
+		project.provide('baseUrl', process.env.SMOKE_URL.replace(/\/+$/, ''));
+		return;
+	}
+
 	try {
 		execFileSync('npm', ['run', 'build'], { stdio: 'pipe' });
 	} catch (error) {
