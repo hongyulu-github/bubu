@@ -97,16 +97,27 @@ export function rowDrag(options: {
 
 /**
  * Report every completed drop on a row. A drop outside any row, on the dragged row itself, or a
- * cancelled drag (Escape) has no target and reports nothing. Returns the cleanup.
+ * cancelled drag (Escape) has no target and reports nothing. `onhover`, when given, follows the
+ * pointer while dragging: the drop it would make right now, or null when over no row, and null
+ * again when the drag ends however it ends. Returns the cleanup.
  */
-export function monitorRowDrops(ondrop: (request: DropRequest) => void): () => void {
+export function monitorRowDrops(ondrop: (request: DropRequest) => void, onhover?: (request: DropRequest | null) => void): () => void {
+	const requestAt = (source: { data: Record<string | symbol, unknown> }, target: { data: Record<string | symbol, unknown> } | undefined) => {
+		const drop = target && resolveDrop(target.data);
+		const { id: dragId } = source.data;
+		return drop && typeof dragId === 'string' ? { dragId, ...drop } : null;
+	};
+	const hover = ({ source, location }: Parameters<NonNullable<Parameters<typeof monitorForElements>[0]['onDrag']>>[0]) =>
+		onhover?.(requestAt(source, location.current.dropTargets[0]));
 	return monitorForElements({
 		canMonitor: ({ source }) => source.data.type === ROW,
+		onDragStart: hover,
+		onDrag: hover,
+		onDropTargetChange: hover, // enter and leave, as they happen (onDrag follows the pointer within a row)
 		onDrop({ source, location }) {
-			const target = location.current.dropTargets[0];
-			const drop = target && resolveDrop(target.data);
-			const { id: dragId } = source.data;
-			if (drop && typeof dragId === 'string') ondrop({ dragId, ...drop });
+			onhover?.(null);
+			const request = requestAt(source, location.current.dropTargets[0]);
+			if (request) ondrop(request);
 		}
 	});
 }

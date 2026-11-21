@@ -12,6 +12,7 @@
 	} from '../budget/grid';
 	import { formatAmount } from '../budget/currency';
 	import { toString } from '../budget/numbers';
+	import { guardMove } from '../budget/guard';
 	import { DRAG_HANDLE, monitorRowDrops, rowDrag, type DropRequest } from '../editor/drag';
 	import Icon from '../components/Icon.svelte';
 	import IconButton from '../components/IconButton.svelte';
@@ -75,7 +76,44 @@
 		void footHeight;
 		measureScroll();
 	});
-	$effect(() => (onmove ? monitorRowDrops(onmove) : undefined));
+	// The drop the pointer would make right now, while a row is being dragged. Cleared when the drag ends
+	// (dropped, cancelled) and when the table goes away or stops accepting moves.
+	let hover = $state.raw<DropRequest | null>(null);
+	function follow(next: DropRequest | null) {
+		const same = next === hover || (next && hover && next.dragId === hover.dragId && next.targetId === hover.targetId && next.intent === hover.intent);
+		if (!same) hover = next;
+	}
+	$effect(() => {
+		if (!onmove) return;
+		const stop = monitorRowDrops(onmove, follow);
+		return () => {
+			stop();
+			hover = null;
+		};
+	});
+
+	/**
+	 * Where to draw the drop marker: on one row, as a line above it, a line below it, a box around it, or
+	 * a "not allowed" mark. Validity comes from the same guard the move itself goes through. A drop
+	 * after a Group lands below its whole visible subtree, so the line is drawn on the subtree's last row
+	 * at the Group's own indent.
+	 */
+	const indicator = $derived.by(() => {
+		if (!hover) return null;
+		const index = rows.findIndex((row) => row.id === hover!.targetId);
+		if (index < 0) return null;
+		const target = rows[index];
+		const allowed = guardMove(
+			rows.map((row) => row.item),
+			{ itemId: hover.dragId, targetId: hover.targetId, intent: hover.intent }
+		).ok;
+		if (!allowed) return { rowId: target.id, kind: 'blocked', depth: target.depth } as const;
+		if (hover.intent !== 'after') return { rowId: target.id, kind: hover.intent, depth: target.depth } as const;
+		let end = index;
+		while (rows[end + 1] && rows[end + 1].depth > target.depth) end++;
+		// A line drawn under deeper rows steps back out to the Group's level: shown with an arrow.
+		return { rowId: rows[end].id, kind: 'after', depth: target.depth, out: end > index } as const;
+	});
 
 	// For dragging: each row's ancestors, and whether it is the last visible row of its parent. Only
 	// descendants can be hidden, so a row's ancestors are always among `rows`.
@@ -245,6 +283,9 @@
 					data-depth={row.depth}
 					data-section={group || row.depth > 0 ? '' : undefined}
 					style:--row-tint={group ? `var(--tint-depth-${Math.min(row.depth, 2)})` : undefined}
+					data-drop={indicator?.rowId === row.id ? indicator.kind : undefined}
+					data-drop-out={indicator?.rowId === row.id && 'out' in indicator && indicator.out ? '' : undefined}
+					style:--drop-depth={indicator?.rowId === row.id ? indicator.depth : undefined}
 					{@attach onmove
 						? rowDrag({
 								id: row.id,
@@ -535,6 +576,103 @@
 
 	tbody tr:hover :global(.cell:not(.selected)) {
 		background-image: linear-gradient(var(--color-hover), var(--color-hover));
+	}
+
+	/* Drop markers (while dragging a row). Each is told apart by shape as well as colour: a line above
+	   (before), a line below (after), a box around the row (inside), a dashed outline and faded row
+	   (not allowed). The lines start at the indent of the level the Item would land on. */
+	/* The line starts at the level the Item would land on, a dot marks its start, and each level steps in by
+	   2rem: the width of that level's drop zone, so sibling and "after the parent" are visibly different
+	   places. */
+	tbody tr[data-drop] {
+		--drop-inset: calc(var(--space-3) + min(var(--drop-depth, 0) * 2 * var(--space-4), 12rem));
+		--drop-line: linear-gradient(var(--color-accent), var(--color-accent));
+		--drop-dot: radial-gradient(circle, var(--color-accent) 0 3px, transparent 3.5px);
+	}
+
+	tbody tr[data-drop='before'] :global(.cell),
+	tbody tr[data-drop='after'] :global(.cell) {
+		background-image: var(--drop-line);
+		background-size: 100% 3px;
+		background-repeat: no-repeat;
+	}
+
+	tbody tr[data-drop='before'] :global(.cell) {
+		background-position: 0 2px;
+	}
+
+	tbody tr[data-drop='after'] :global(.cell) {
+		background-position: 0 calc(100% - 2px);
+	}
+
+	tbody tr[data-drop='before'] :global(.cell:first-child),
+	tbody tr[data-drop='after'] :global(.cell:first-child) {
+		background-image: var(--drop-dot), var(--drop-line);
+		background-size:
+			7px 7px,
+			calc(100% - var(--drop-inset)) 3px;
+	}
+
+	tbody tr[data-drop='before'] :global(.cell:first-child) {
+		background-position:
+			var(--drop-inset) 0,
+			var(--drop-inset) 2px;
+	}
+
+	tbody tr[data-drop='after'] :global(.cell:first-child) {
+		background-position:
+			var(--drop-inset) 100%,
+			var(--drop-inset) calc(100% - 2px);
+	}
+
+	/* A drop after a Group's subtree is a change of level, not just of order: an arrow points back out to
+	   the Group's level instead of the dot. */
+	tbody tr[data-drop-out] :global(.cell:first-child) {
+		position: relative;
+		background-image: var(--drop-line);
+		background-size: calc(100% - var(--drop-inset)) 3px;
+		background-position: var(--drop-inset) calc(100% - 2px);
+	}
+
+	tbody tr[data-drop-out] :global(.cell:first-child)::after {
+		content: '';
+		position: absolute;
+		left: var(--drop-inset);
+		top: calc(100% - 9.5px);
+		width: 14px;
+		height: 12px;
+		background: var(--color-accent);
+		/* a left-pointing arrow: head, then shaft */
+		clip-path: polygon(0 50%, 45% 5%, 45% 33%, 100% 33%, 100% 67%, 45% 67%, 45% 95%);
+		pointer-events: none;
+	}
+
+	tbody tr[data-drop='inside'] :global(.cell) {
+		background-image: linear-gradient(var(--color-selected), var(--color-selected));
+		box-shadow:
+			inset 0 2px 0 var(--color-accent),
+			inset 0 -2px 0 var(--color-accent);
+	}
+
+	tbody tr[data-drop='inside'] :global(.cell:first-child) {
+		box-shadow:
+			inset 2px 0 0 var(--color-accent),
+			inset 0 2px 0 var(--color-accent),
+			inset 0 -2px 0 var(--color-accent);
+	}
+
+	tbody tr[data-drop='inside'] :global(.cell:last-child) {
+		box-shadow:
+			inset -2px 0 0 var(--color-accent),
+			inset 0 2px 0 var(--color-accent),
+			inset 0 -2px 0 var(--color-accent);
+	}
+
+	tbody tr[data-drop='blocked'] {
+		outline: 2px dashed var(--color-danger);
+		outline-offset: -2px;
+		opacity: 0.55;
+		cursor: not-allowed;
 	}
 
 	.code {

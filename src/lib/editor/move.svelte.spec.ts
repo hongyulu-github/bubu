@@ -86,6 +86,7 @@ describe('moving rows by pointer', () => {
 		await drop(3, 2, BEFORE);
 		expect(ids()).toEqual([1, 3, 2, 4, 5, 6, 7]);
 		expect(codes()).toEqual(['1', '1.1', '1.2', '2', '3', '3.1', '4']);
+		expect(document.querySelector('[data-drop]')).toBeNull(); // no marker left over after the drop
 
 		await undo();
 		expect(ids()).toEqual([1, 2, 3, 4, 5, 6, 7]);
@@ -145,6 +146,7 @@ describe('moving rows by pointer', () => {
 		expect(byId(store, 5)).toMatchObject({ unitPrice: '0', quantity: '2', description: 'Item 5' });
 		await expect.poll(() => row(5).querySelector('td[data-cell$="unitPrice"] input')).not.toBeNull(); // a Line again
 		await expect.element(grandTotal()).toHaveTextContent('-€756.50'); // 30 + 5 - 40 + 0 - 751.5
+		expect(document.querySelector('[data-drop]')).toBeNull();
 
 		await undo();
 		await expect.poll(() => row(5).querySelector('td[data-cell$="unitPrice"] input')).toBeNull(); // a Group again
