@@ -3,6 +3,7 @@
 	import type { Budget } from '../budget/model';
 	import { CURRENCIES } from '../budget/currencies';
 	import { validateBudgetForm, type BudgetFormErrors } from '../budget/create';
+	import { downloadTemplate } from '../excel/template';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Select from '../components/Select.svelte';
@@ -25,6 +26,17 @@
 
 	const errors: BudgetFormErrors = $derived(attempted ? validateBudgetForm({ name, currency }) : {});
 	const currencyOptions = CURRENCIES.map(({ code, name }) => ({ value: code, label: `${code} · ${name}` }));
+
+	let templateFailed = $state(false);
+
+	async function getTemplate() {
+		templateFailed = false;
+		try {
+			await downloadTemplate();
+		} catch {
+			templateFailed = true;
+		}
+	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -56,6 +68,13 @@
 			<Button type="submit" variant="primary" disabled={store.hydrationStatus === 'idle'}>Create Budget</Button>
 		</div>
 	</form>
+	<p class="alt">
+		Prefer to start in Excel?
+		<button type="button" class="link" onclick={getTemplate}>Download an empty template</button>
+	</p>
+	{#if templateFailed}
+		<p class="alt problem" role="alert">The template could not be created. Please try again.</p>
+	{/if}
 </main>
 
 <style>
@@ -97,6 +116,31 @@
 		text-decoration: none;
 	}
 
+	.alt {
+		margin: 0;
+		color: var(--color-text-secondary);
+		font-size: var(--font-size-callout);
+	}
+
+	.problem {
+		color: var(--color-danger);
+	}
+
+	.link {
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-weight: var(--font-weight-semibold);
+		cursor: pointer;
+	}
+
+	.link:hover {
+		text-decoration: underline;
+	}
+
+	.link:focus-visible,
 	.cancel:focus-visible {
 		outline: var(--focus-ring-width) solid var(--color-focus-ring);
 		outline-offset: var(--focus-ring-offset);

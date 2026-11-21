@@ -6,6 +6,8 @@ import '../styles/base.css';
 import { createBudget, createItem } from '../budget/model';
 import { toString } from '../budget/numbers';
 import { CommandHistory } from '../history/commands';
+import { TEMPLATE_FILENAME } from '../excel/template';
+import { XLSX_MIME, readWorkbook } from '../excel/workbook';
 import { bubuStorage } from '../storage/bubu';
 import { BudgetStore } from '../state/budgets.svelte';
 import CreateBudgetForm from './CreateBudgetForm.svelte';
@@ -159,5 +161,51 @@ describe('CreateBudgetForm', () => {
 	it('links back to the Budgets list', async () => {
 		setup();
 		await expect.element(page.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/budgets');
+	});
+
+	describe('Download an empty template', () => {
+		/** Catch the file the browser would be given, without actually saving it. */
+		function captureDownload() {
+			const blobs: Blob[] = [];
+			const names: string[] = [];
+			vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+				blobs.push(blob as Blob);
+				return 'blob:test';
+			});
+			vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+			vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+				names.push(this.download);
+			});
+			return { blobs, names };
+		}
+		afterEach(() => vi.restoreAllMocks());
+
+		it('offers the template as a download and gives an .xlsx file with the six headers and no rows', async () => {
+			setup();
+			const download = captureDownload();
+
+			await page.getByRole('button', { name: 'Download an empty template' }).click();
+
+			await expect.poll(() => download.blobs.length).toBe(1);
+			expect(download.names).toEqual([TEMPLATE_FILENAME]);
+			expect(download.blobs[0].type).toBe(XLSX_MIME);
+			const workbook = await readWorkbook(await download.blobs[0].arrayBuffer());
+			expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(['Budget']); // no hidden metadata sheet
+			const sheet = workbook.getWorksheet('Budget')!;
+			expect(sheet.getRow(1).values).toEqual([undefined, 'Code', 'Description', 'Quantity', 'Unit', 'Unit price', 'Total']);
+			expect(sheet.actualRowCount).toBe(1);
+		});
+
+		it('creates no Budget and leaves the form as it was', async () => {
+			const { store, onCreated } = setup();
+			captureDownload();
+			await name().fill('Typed name');
+
+			await page.getByRole('button', { name: 'Download an empty template' }).click();
+
+			expect(store.budgets).toEqual([]);
+			expect(onCreated).not.toHaveBeenCalled();
+			await expect.element(name()).toHaveValue('Typed name');
+		});
 	});
 });
