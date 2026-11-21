@@ -2,7 +2,6 @@
 	import '#lib/styles/theme.css';
 	import '#lib/styles/tokens.css';
 	import '#lib/styles/base.css';
-	import favicon from '#lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
 	import { budgetPersistence, budgetStore } from '#lib';
 	import SaveStatus from '#lib/budgets/SaveStatus.svelte';
@@ -18,10 +17,6 @@
 		return budgetPersistence.start();
 	});
 </script>
-
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
 
 <SaveStatus />
 

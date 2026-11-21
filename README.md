@@ -77,3 +77,4 @@ git pull --ff-only
 - Push access requires being authenticated as the `hongyulu-github` account (SSH key or `gh auth login`).
 - Never commit secrets. `.env` and `.env.*` are ignored; commit only `.env.example` files with placeholder values.
 - Dependencies (`node_modules/`) and build output (`/build`, `/.svelte-kit`) are ignored.
+- Page metadata (title, description, Open Graph, icons, manifest) is in `src/app.html` (shared) and `src/lib/components/Seo.svelte` (per page). The tags and files that need a full address (canonical link, `og:url`, `og:image`, the sitemap entry and `Sitemap:` line) appear only when the build has `VITE_SITE_URL` set, for example `VITE_SITE_URL=https://your-domain npm run build`. Set it in the host's environment when deploying.
