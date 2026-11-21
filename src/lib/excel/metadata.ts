@@ -116,7 +116,7 @@ export function encodeMetadata(workbook: Workbook, budget: Budget, items: readon
 // --- Reading ---------------------------------------------------------------------------------------
 
 /** The text of a cell however it is stored; null for an empty cell. Numbers become plain text. */
-function textOf(value: CellValue | undefined): string | null {
+export function textOf(value: CellValue | undefined): string | null {
 	if (value === null || value === undefined) return null;
 	if (typeof value === 'string') return value;
 	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -204,7 +204,7 @@ export function readMetadata(workbook: Workbook): ReadMetadataResult {
 const parentCode = (code: string): string | null => (code.includes('.') ? code.slice(0, code.lastIndexOf('.')) : null);
 
 /** Plain decimal text for a number read from a cell, never in exponent form. */
-function numberText(value: number): string | null {
+export function numberText(value: number): string | null {
 	if (!Number.isFinite(value)) return null;
 	const text = String(value);
 	if (!/e/i.test(text)) return text;
