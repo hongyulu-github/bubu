@@ -12,11 +12,11 @@ afterEach(() => {
 describe('Seo', () => {
 	it('gives the landing page the product title, a description and the share card tags', () => {
 		render(Seo, { site: '' });
-		expect(document.title).toBe('BuBu: build Budgets, one Item at a time');
+		expect(document.title).toBe('bubu: build Budgets, one Item at a time');
 		expect(meta('meta[name="description"]')!.length).toBeGreaterThan(40);
 		expect(meta('meta[property="og:title"]')).toBe(document.title);
 		expect(meta('meta[property="og:type"]')).toBe('website');
-		expect(meta('meta[property="og:site_name"]')).toBe('BuBu');
+		expect(meta('meta[property="og:site_name"]')).toBe('bubu');
 		expect(meta('meta[name="twitter:card"]')).toBe('summary_large_image');
 		expect(meta('meta[name="robots"]')).toBeUndefined();
 	});
@@ -38,10 +38,10 @@ describe('Seo', () => {
 		expect(meta('meta[name="twitter:image"]')).toBe('https://bubu.example/og-image.png');
 	});
 
-	it('titles a named page "Name · BuBu"', () => {
+	it('titles a named page "Name · bubu"', () => {
 		render(Seo, { name: 'Our Wedding', site: '' });
-		expect(document.title).toBe('Our Wedding · BuBu');
-		expect(meta('meta[property="og:title"]')).toBe('Our Wedding · BuBu');
+		expect(document.title).toBe('Our Wedding · bubu');
+		expect(meta('meta[property="og:title"]')).toBe('Our Wedding · bubu');
 	});
 
 	it('keeps a noindex page out of search results and gives it no canonical link', () => {

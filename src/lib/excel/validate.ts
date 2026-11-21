@@ -16,7 +16,7 @@ import { readWorkbook } from './workbook';
 /**
  * Check a workbook before anything is built from it (LUL-37): every problem is reported with its row and
  * column, together, and nothing is changed or constructed. A workbook with the six named columns and
- * well-formed Codes is valid with or without BuBu metadata; when metadata is present its version and
+ * well-formed Codes is valid with or without Bubu metadata; when metadata is present its version and
  * row associations are checked too, so an identity is never silently given to a different row.
  *
  * Editable numbers follow the same exact-decimal rules as the editor: Quantity is zero or more
@@ -63,7 +63,7 @@ export interface ValidatedRow {
 }
 
 export type ValidationResult =
-	| { ok: true; rows: ValidatedRow[]; /** The saved Budget document and identities, when the workbook carries BuBu metadata. */ metadata: WorkbookMetadata | null }
+	| { ok: true; rows: ValidatedRow[]; /** The saved Budget document and identities, when the workbook carries Bubu metadata. */ metadata: WorkbookMetadata | null }
 	| { ok: false; errors: ValidationError[] };
 
 const CODE_PATTERN = /^\d+(\.\d+)*$/;
@@ -167,7 +167,7 @@ export function validateBudgetWorkbook(workbook: Workbook): ValidationResult {
 		}
 	}
 
-	// BuBu metadata is optional, but when it is there it must be supported and agree with the visible rows.
+	// Bubu metadata is optional, but when it is there it must be supported and agree with the visible rows.
 	let metadata: WorkbookMetadata | null = null;
 	if (workbook.getWorksheet(METADATA_SHEET)) {
 		const read = readMetadata(workbook);

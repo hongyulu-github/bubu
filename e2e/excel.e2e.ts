@@ -30,7 +30,7 @@ describe('ExcelJS in the built static site', () => {
 
 		const status = await page.getByRole('status').innerText();
 		expect(status).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-		expect(status).toContain('A1 = BuBu');
+		expect(status).toContain('A1 = bubu');
 		expect(errors).toEqual([]);
 		expect(requests.every((url) => url.startsWith(baseUrl))).toBe(true); // static files only: no API, no CDN
 		await page.context().close();

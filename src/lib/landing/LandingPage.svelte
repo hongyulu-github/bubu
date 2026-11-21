@@ -35,7 +35,7 @@
 -->
 <main>
 	<header>
-		<!-- Text for now; a logo replaces it here later. --><span class="brand">BuBu</span>
+		<!-- Text for now; a logo replaces it here later. --><span class="brand">bubu</span>
 	</header>
 
 	<div class="screen">

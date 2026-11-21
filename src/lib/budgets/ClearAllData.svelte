@@ -18,12 +18,12 @@
 	// Rare and permanent, so it lives in a "⋯" menu (destructive item, red, with an ellipsis because it asks again)
 	// and not as a button on the page; the dialog is the real confirmation. Nothing to clear means no menu.
 	const items: MenuItem[] = [
-		{ id: 'clear', label: 'Clear all BuBu data…', icon: 'trash', destructive: true, onselect: () => (confirming = true) }
+		{ id: 'clear', label: 'Clear all Bubu data…', icon: 'trash', destructive: true, onselect: () => (confirming = true) }
 	];
 
 	function confirm() {
 		const result = store.clearAll();
-		onmessage?.(result.ok ? 'All BuBu data was cleared.' : 'BuBu data could not be cleared.');
+		onmessage?.(result.ok ? 'All Bubu data was cleared.' : 'Bubu data could not be cleared.');
 	}
 </script>
 

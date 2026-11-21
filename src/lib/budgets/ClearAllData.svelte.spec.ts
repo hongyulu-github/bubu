@@ -26,7 +26,7 @@ const newStore = () => {
 	store.hydrate();
 	return store;
 };
-/** The Budgets drawer, open on the saved list, where the "⋯" menu with Clear all BuBu data lives. */
+/** The Budgets drawer, open on the saved list, where the "⋯" menu with Clear all Bubu data lives. */
 const openDrawer = async (store: BudgetStore) => {
 	render(BudgetsDrawer, { open: true, view: 'list', store, oncreated: vi.fn() });
 	await settled(); // it slides in: wait until it is in place, or a click can land on the dimmed page instead
@@ -34,9 +34,9 @@ const openDrawer = async (store: BudgetStore) => {
 
 const open = async () => {
 	await page.getByRole('button', { name: 'More actions' }).click();
-	await page.getByRole('menuitem', { name: 'Clear all BuBu data…' }).click();
+	await page.getByRole('menuitem', { name: 'Clear all Bubu data…' }).click();
 };
-const confirm = () => page.getByRole('dialog', { name: 'Clear all BuBu data?' }).getByRole('button', { name: 'Clear all BuBu data' }).click();
+const confirm = () => page.getByRole('dialog', { name: 'Clear all Bubu data?' }).getByRole('button', { name: 'Clear all Bubu data' }).click();
 const keep = () => {
 	localStorage.setItem('other-app:settings', '{"theme":"dark"}');
 	localStorage.setItem('unrelated', 'x');
@@ -45,11 +45,11 @@ const keep = () => {
 beforeEach(() => localStorage.clear());
 afterEach(() => localStorage.clear());
 
-describe('Clear all BuBu data, in the Budgets drawer', () => {
+describe('Clear all Bubu data, in the Budgets drawer', () => {
 	it('is a destructive item in a "⋯" menu to the right of the "My budgets" title, beside Close', async () => {
 		seed();
 		await openDrawer(newStore());
-		await expect.element(page.getByRole('button', { name: 'Clear all BuBu data' })).not.toBeInTheDocument(); // not a button on the page
+		await expect.element(page.getByRole('button', { name: 'Clear all Bubu data' })).not.toBeInTheDocument(); // not a button on the page
 		const title = page.getByRole('heading', { name: 'My budgets' }).element().getBoundingClientRect();
 		const more = page.getByRole('button', { name: 'More actions' }).element().getBoundingClientRect();
 		const close = page.getByRole('button', { name: 'Close', exact: true }).element().getBoundingClientRect();
@@ -58,7 +58,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 		expect(Math.abs(more.top + more.height / 2 - (title.top + title.height / 2))).toBeLessThan(12); // on the same line
 
 		await page.getByRole('button', { name: 'More actions' }).click();
-		await expect.element(page.getByRole('menuitem', { name: 'Clear all BuBu data…' })).toBeVisible();
+		await expect.element(page.getByRole('menuitem', { name: 'Clear all Bubu data…' })).toBeVisible();
 	});
 
 	it('has no "New budget" button in the list any more', async () => {
@@ -82,7 +82,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 		seed();
 		await openDrawer(newStore());
 		await open();
-		const dialog = page.getByRole('dialog', { name: 'Clear all BuBu data?' });
+		const dialog = page.getByRole('dialog', { name: 'Clear all Bubu data?' });
 		await expect.element(dialog).toBeVisible();
 		await expect.element(dialog).toHaveTextContent('all 2 of your Budgets');
 		await expect.element(dialog).toHaveTextContent('cannot be undone');
@@ -103,7 +103,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 		await open();
 		await userEvent.keyboard('{Escape}');
 
-		await expect.element(page.getByRole('dialog', { name: 'Clear all BuBu data?' })).not.toBeInTheDocument();
+		await expect.element(page.getByRole('dialog', { name: 'Clear all Bubu data?' })).not.toBeInTheDocument();
 		await expect.element(page.getByRole('dialog', { name: 'My budgets' })).toBeVisible(); // Escape closed only the question
 		expect(JSON.stringify({ ...localStorage })).toBe(before);
 		expect(store.budgets).toBe(budgets);
@@ -124,7 +124,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		stopAutosave();
 
-		await expect.element(page.getByRole('dialog', { name: 'Clear all BuBu data?' })).not.toBeInTheDocument();
+		await expect.element(page.getByRole('dialog', { name: 'Clear all Bubu data?' })).not.toBeInTheDocument();
 		expect(Object.keys(localStorage).sort()).toEqual(['other-app:settings', 'unrelated']);
 		expect(localStorage.getItem('other-app:settings')).toBe('{"theme":"dark"}');
 		expect(localStorage.getItem('unrelated')).toBe('x');
@@ -133,7 +133,7 @@ describe('Clear all BuBu data, in the Budgets drawer', () => {
 		expect(document.querySelectorAll('ul li')).toHaveLength(0);
 		expect(store.budgets).toEqual([]);
 		expect(store.canUndo(A)).toBe(false); // no stale history can bring a cleared Budget back
-		await expect.element(page.getByRole('status')).toHaveTextContent('All BuBu data was cleared.');
+		await expect.element(page.getByRole('status')).toHaveTextContent('All Bubu data was cleared.');
 		await expect.element(page.getByRole('dialog', { name: 'My budgets' })).toBeVisible(); // the drawer is still there, now empty
 	});
 });

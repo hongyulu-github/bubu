@@ -718,7 +718,7 @@ describe('clearAll', () => {
 		expect(localStorage.getItem('bubu')).toBe('no colon');
 	});
 
-	it('also removes data that could not be loaded, since it is BuBu data too', () => {
+	it('also removes data that could not be loaded, since it is Bubu data too', () => {
 		localStorage.setItem(budgetKey(A), '{broken');
 		const store = newStore();
 		store.hydrate();

@@ -51,7 +51,7 @@ describe('deployed site smoke test', () => {
 	it('loads the landing page and opens the Budgets drawer', async () => {
 		await page.goto(`${baseUrl}/`);
 		await page.getByRole('heading', { level: 1, name: 'Build a Budget, one Item at a time' }).waitFor();
-		expect(await page.title()).toContain('BuBu');
+		expect(await page.title()).toContain('bubu');
 		await page.getByRole('button', { name: 'My budgets', exact: true }).click();
 		await drawerSettled();
 		await page.getByRole('dialog', { name: 'My budgets', exact: true }).waitFor();

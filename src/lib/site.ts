@@ -10,12 +10,12 @@ export function absoluteUrl(path: string, site: string = SITE_URL): string | nul
 	return site ? `${site}${path.startsWith('/') ? path : `/${path}`}` : null;
 }
 
-export const SITE_NAME = 'BuBu';
-export const DEFAULT_TITLE = 'BuBu: build Budgets, one Item at a time';
+export const SITE_NAME = 'bubu';
+export const DEFAULT_TITLE = 'bubu: build Budgets, one Item at a time';
 export const DEFAULT_DESCRIPTION =
 	'Build a Budget as a tree of Items, where every Total adds up on its own. Free, no account, and your data stays on your device.';
 
-/** "Our Wedding · BuBu" for a named page; the product line for the landing page. */
+/** "Our Wedding · bubu" for a named page; the product line for the landing page. */
 export function pageTitle(name?: string): string {
 	return name?.trim() ? `${name.trim()} · ${SITE_NAME}` : DEFAULT_TITLE;
 }

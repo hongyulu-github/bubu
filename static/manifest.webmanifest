@@ -1,6 +1,6 @@
 {
-	"name": "BuBu",
-	"short_name": "BuBu",
+	"name": "bubu",
+	"short_name": "bubu",
 	"description": "Build a Budget as a tree of Items. Every Total adds up on its own. Free, and your data stays on your device.",
 	"start_url": "/",
 	"scope": "/",

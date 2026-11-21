@@ -14,7 +14,7 @@ const STORAGE_REASONS: Record<StorageErrorKind, string> = {
 	'write-failed': 'your browser refused to save the data',
 	'read-failed': 'your browser could not read the saved data',
 	corrupt: 'the saved data is damaged',
-	'unsupported-version': 'the saved data was written by a newer version of BuBu',
+	'unsupported-version': 'the saved data was written by a newer version of Bubu',
 	'invalid-data': 'the data is not a valid Budget',
 	'unreadable-existing': 'unreadable saved data is already there, so it was left untouched',
 	'not-found': 'the saved data could not be found'

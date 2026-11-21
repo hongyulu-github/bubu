@@ -20,7 +20,7 @@ describe('page metadata on the built site', () => {
 		expect(await attr('html', 'lang')).toBe('en');
 		expect(await count('meta[charset="utf-8" i]')).toBe(1);
 		expect(await attr('meta[name="viewport"]', 'content')).toBe('width=device-width, initial-scale=1');
-		expect(await page.title()).toBe('BuBu: build Budgets, one Item at a time');
+		expect(await page.title()).toBe('bubu: build Budgets, one Item at a time');
 		expect(await count('title')).toBe(1);
 		expect(await count('meta[name="description"]')).toBe(1); // one, never two
 		expect((await attr('meta[name="description"]', 'content'))!.length).toBeGreaterThan(40);
@@ -53,7 +53,7 @@ describe('page metadata on the built site', () => {
 
 	it('has the share card tags', async () => {
 		await page.goto(`${baseUrl}/`);
-		expect(await attr('meta[property="og:title"]', 'content')).toBe('BuBu: build Budgets, one Item at a time');
+		expect(await attr('meta[property="og:title"]', 'content')).toBe('bubu: build Budgets, one Item at a time');
 		expect(await attr('meta[property="og:type"]', 'content')).toBe('website');
 		expect((await attr('meta[property="og:description"]', 'content'))!.length).toBeGreaterThan(40);
 		expect(await attr('meta[name="twitter:card"]', 'content')).toBe('summary_large_image');
@@ -64,7 +64,7 @@ describe('page metadata on the built site', () => {
 		const response = await page.request.get(`${baseUrl}${await attr('link[rel="manifest"]', 'href').then((href) => href!.replace(/^\./, ''))}`);
 		expect(response.status()).toBe(200);
 		const manifest = await response.json();
-		expect(manifest).toMatchObject({ name: 'BuBu', short_name: 'BuBu', start_url: '/', display: 'standalone' });
+		expect(manifest).toMatchObject({ name: 'bubu', short_name: 'bubu', start_url: '/', display: 'standalone' });
 		expect(manifest.background_color).toMatch(/^#/);
 		expect(manifest.theme_color).toMatch(/^#/);
 		const sizes = manifest.icons.map((icon: { sizes: string }) => icon.sizes);
@@ -93,7 +93,7 @@ describe('page metadata on the built site', () => {
 		await page.goto(`${baseUrl}/budgets/${A}`);
 		await page.waitForFunction(() => document.title.includes('Wedding') || document.title.includes('Budget'));
 		expect(await attr('meta[name="robots"]', 'content')).toBe('noindex, nofollow');
-		expect(await page.title()).toMatch(/· BuBu$/);
+		expect(await page.title()).toMatch(/· bubu$/);
 
 		await page.goto(`${baseUrl}/design`);
 		expect(await attr('meta[name="robots"]', 'content')).toBe('noindex, nofollow');

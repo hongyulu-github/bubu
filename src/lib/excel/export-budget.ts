@@ -8,7 +8,7 @@ import { GRAND_TOTAL_LABEL, VISIBLE_COLUMNS, encodeMetadata, ensureBudgetSheet }
 import { createWorkbook, writeWorkbook } from './workbook';
 
 /**
- * A Budget as a readable workbook that can also come back to BuBu without loss (LUL-35, with live formulas and the app's look as a follow-up).
+ * A Budget as a readable workbook that can also come back to Bubu without loss (LUL-35, with live formulas and the app's look as a follow-up).
  *
  * The visible sheet follows the shared contract: the six columns, a Grand total row under the header, then
  * one row per Item in tree order from row 3. The arithmetic is live, so editing a number in Excel updates everything above it: a row's Total

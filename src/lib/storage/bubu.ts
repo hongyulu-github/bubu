@@ -2,7 +2,7 @@ import type { Budget, Item, Uuid } from '../budget/model';
 import { isUuid, validateBudget, validateItems, type ValidationIssue } from '../budget/validation';
 
 /**
- * The single browser-local persistence boundary for BuBu (localStorage).
+ * The single browser-local persistence boundary for Bubu (localStorage).
  *
  * Layout, every key prefixed `bubu:`:
  *   bubu:budget:<budgetId>  ->  { version, data: Budget }
@@ -122,7 +122,7 @@ export function createBubuStorage(getStorage: () => Storage | null = getBrowserS
 			return fail({ kind: 'corrupt', key, message: `${key} is not valid JSON.`, cause });
 		}
 		if (typeof envelope !== 'object' || envelope === null || !('version' in envelope) || !('data' in envelope)) {
-			return fail({ kind: 'corrupt', key, message: `${key} is not a BuBu storage envelope.` });
+			return fail({ kind: 'corrupt', key, message: `${key} is not a Bubu storage envelope.` });
 		}
 		if (envelope.version !== SCHEMA_VERSION) {
 			return fail({

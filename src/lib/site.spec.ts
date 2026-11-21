@@ -11,9 +11,9 @@ describe('site addresses', () => {
 		expect(absoluteUrl('/', '')).toBeNull();
 	});
 
-	it('titles a named page "Name · BuBu" and the landing page with the product line', () => {
-		expect(pageTitle('Our Wedding')).toBe('Our Wedding · BuBu');
-		expect(pageTitle('  Trip  ')).toBe('Trip · BuBu');
+	it('titles a named page "Name · bubu" and the landing page with the product line', () => {
+		expect(pageTitle('Our Wedding')).toBe('Our Wedding · bubu');
+		expect(pageTitle('  Trip  ')).toBe('Trip · bubu');
 		expect(pageTitle()).toBe(DEFAULT_TITLE);
 		expect(pageTitle('   ')).toBe(DEFAULT_TITLE);
 	});

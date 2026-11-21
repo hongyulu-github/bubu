@@ -1,6 +1,6 @@
 # Deployment (Vercel)
 
-BuBu is a fully static site: no server, no API, no accounts. Everything a user makes is stored in their own browser.
+Bubu is a fully static site: no server, no API, no accounts. Everything a user makes is stored in their own browser.
 
 ## Production URL
 

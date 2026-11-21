@@ -281,7 +281,7 @@ describe('BudgetsList', () => {
 		expect(JSON.stringify({ ...localStorage })).toBe(before);
 	});
 
-	describe('after all BuBu data is cleared', () => {
+	describe('after all Bubu data is cleared', () => {
 		it('shows the editor of a cleared Budget as not found', async () => {
 			seed();
 			const store = newStore();

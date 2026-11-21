@@ -1,4 +1,4 @@
-/* BuBu's theme: Tailwind 4 with Flowbite Svelte. The palette is the one the app has always had, the former stdf "Starbucks"
+/* Bubu's theme: Tailwind 4 with Flowbite Svelte. The palette is the one the app has always had, the former stdf "Starbucks"
    theme (green and warm neutrals), written out here as its exact values so nothing depends on that library. Radius, spacing
    and type are the app's own tokens (see tokens.css). */
 @import 'tailwindcss';

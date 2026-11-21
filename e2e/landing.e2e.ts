@@ -44,8 +44,8 @@ describe('the landing page (built static site)', () => {
 		expect(text).toContain('No plans, trials or limits.'); // Free
 		expect(text).toContain('Data stays on this device. No accounts, nothing sent to a server.'); // Yours
 		expect(text).toContain('Donations are welcome, and always optional.');
-		expect(await page.title()).toContain('BuBu');
-		expect(await page.locator('.brand').innerText()).toBe('BuBu');
+		expect(await page.title()).toContain('bubu');
+		expect(await page.locator('.brand').innerText()).toBe('bubu');
 	});
 
 	/** One saved Budget (with two Items) written straight into browser storage. */
