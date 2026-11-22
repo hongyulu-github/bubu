@@ -126,9 +126,18 @@ describe('donations', () => {
 		expect(getComputedStyle(document.querySelector('.support')!).backgroundColor).not.toBe('rgba(0, 0, 0, 0)'); // a tinted block, not loose text
 	});
 
-	it('offers no donation link or button until one is decided', async () => {
+	it('makes "Donations are welcome" the link to the GitHub Sponsors profile, in a new tab', async () => {
 		setup();
-		expect(document.querySelectorAll('main a[href]')).toHaveLength(0);
+		const link = page.getByRole('link', { name: 'Donations are welcome' });
+		await expect.element(link).toHaveAttribute('href', 'https://github.com/sponsors/hongyulu-github');
+		await expect.element(link).toHaveAttribute('target', '_blank');
+		await expect.element(link).toHaveAttribute('rel', 'noopener noreferrer');
+		expect(getComputedStyle(link.element()).textDecorationLine).toBe('underline');
+	});
+
+	it('has no other donation link or button', async () => {
+		setup();
+		expect(document.querySelectorAll('main a[href]')).toHaveLength(1); // the sponsor link only
 		expect(page.getByRole('button', { name: /donate/i }).elements()).toHaveLength(0);
 	});
 
@@ -148,7 +157,7 @@ describe('the two buttons', () => {
 		await expect.element(mine).toBeVisible();
 		expect(create.elements()).toHaveLength(1);
 		expect(mine.elements()).toHaveLength(1);
-		expect(document.querySelectorAll('main a[href]')).toHaveLength(0);
+		expect(document.querySelectorAll('main a[href]')).toHaveLength(1); // the sponsor link only, no link beside the buttons
 	});
 
 	it('"Create a budget" calls the creation callback once and does not open the drawer', async () => {

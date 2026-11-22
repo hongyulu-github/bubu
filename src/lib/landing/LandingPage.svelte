@@ -5,6 +5,8 @@
 	import Icon from '../components/Icon.svelte';
 	import FeatureCard from './FeatureCard.svelte';
 
+	const SPONSOR_URL = 'https://github.com/sponsors/hongyulu-github';
+
 	let {
 		oncreate,
 		onopenbudgets,
@@ -78,7 +80,7 @@
 		<span class="heart" aria-hidden="true"><Icon name="heart" size={28} /></span>
 		<div class="words">
 			<h2 id="support-title">Like it? Support it.</h2>
-			<p>No ads and no paywall. Donations are welcome, and always optional.</p>
+			<p>No ads and no paywall. <a href={SPONSOR_URL} target="_blank" rel="noopener noreferrer">Donations are welcome</a>, and always optional.</p>
 		</div>
 		{#if donate}
 			<div class="donate">{@render donate()}</div>
@@ -248,6 +250,13 @@
 	.support p {
 		color: var(--color-text);
 		font-size: var(--font-size-body);
+	}
+
+	/* Underlined, so the sponsor link reads as clickable without hover. */
+	.support a {
+		color: inherit;
+		text-decoration: underline;
+		text-underline-offset: 0.15em;
 	}
 
 	.below {
