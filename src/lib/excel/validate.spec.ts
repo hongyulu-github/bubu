@@ -127,7 +127,7 @@ describe('numeric errors name the cell', () => {
 	});
 
 	it('rejects a blank or non-numeric Line Unit price', async () => {
-		const result = validateBudgetWorkbook(await book([['1', 'a', 1, null, null], ['2', 'b', 1, null, 'ten'], ['3', 'c', 1, null, '1,5']]));
+		const result = validateBudgetWorkbook(await book([['1', 'a', 1, null, null], ['2', 'b', 1, null, 'ten'], ['3', 'c', 1, null, '1,5,5']]));
 		expect(where(result)).toEqual([['invalid-unit-price', 'E2'], ['invalid-unit-price', 'E3'], ['invalid-unit-price', 'E4']]);
 	});
 

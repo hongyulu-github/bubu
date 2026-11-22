@@ -113,7 +113,7 @@ describe('invalid values', () => {
 		for (const field of ['quantity', 'unitPrice'] as const) {
 			expect(edit(field, ''), field).toEqual({ ok: false, reason: 'invalid', message: 'Enter a number.' });
 			expect(edit(field, '   ').ok).toBe(false);
-			for (const text of ['abc', '1e3', '1,5', 'NaN', 'Infinity', '--1', '€5']) {
+			for (const text of ['abc', '1e3', '1,5,5', 'NaN', 'Infinity', '--1', '€5']) {
 				expect(edit(field, text), `${field} ${text}`).toEqual({ ok: false, reason: 'invalid', message: 'Enter a valid number.' });
 			}
 		}

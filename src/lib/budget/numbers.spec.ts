@@ -49,7 +49,9 @@ describe('parsing', () => {
 	it('rejects non-numeric and non-finite input', () => {
 		for (const text of [
 			'abc',
-			'1,000',
+			'1,000.5',
+			'1.000,5',
+			'1,2,3',
 			'1 000',
 			'1e3',
 			'0x10',
@@ -66,6 +68,12 @@ describe('parsing', () => {
 		]) {
 			expect(parseDecimal(text), text).toEqual({ ok: false, error: 'not-a-number' });
 		}
+	});
+
+	it('reads a comma and a dot as the same decimal point, whatever the locale', () => {
+		expect(parseUnitPrice('12,5')).toEqual(parseUnitPrice('12.5'));
+		expect(parseQuantity('0,25')).toEqual({ ok: true, value: { coefficient: 25n, scale: 2 } });
+		expect(parseUnitPrice('-3,5')).toEqual({ ok: true, value: { coefficient: -35n, scale: 1 } });
 	});
 
 	it('trims surrounding whitespace', () => {
