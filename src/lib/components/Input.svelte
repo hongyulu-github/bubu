@@ -35,7 +35,7 @@
 		color={error ? 'red' : 'default'}
 		aria-invalid={error ? 'true' : undefined}
 		aria-describedby={[hint ? hintId : '', messageId].filter(Boolean).join(' ')}
-		class={[compact ? 'border-transparent bg-transparent hover:border-gray-500 dark:hover:border-gray-400' : 'border-gray-500 dark:border-gray-400', numeric && 'text-end tabular-nums']}
+		class={[compact ? 'border-transparent bg-transparent dark:border-transparent hover:border-gray-500 dark:hover:border-gray-400' : 'border-gray-500 dark:border-gray-400', 'dark:bg-transparent', numeric && 'text-end tabular-nums']}
 		{...rest as Record<string, unknown>}
 	/>
 	{#if hint}

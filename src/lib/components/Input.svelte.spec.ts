@@ -2,7 +2,8 @@ import { page, userEvent } from 'vitest/browser';
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../styles/tokens.css';
-import { contrastRatio, focusDocument, resetTheme, setTheme, type Theme } from '../testing/theme';
+import '../styles/base.css'; // the page background the input sits on, so a transparent input is measured against it
+import { contrastRatio, effectiveBackground, focusDocument, resetTheme, setTheme, type Theme } from '../testing/theme';
 import Input from './Input.svelte';
 
 afterEach(resetTheme);
@@ -42,8 +43,25 @@ describe('Input', () => {
 	it.each<Theme>(['light', 'dark'])('has readable text and a visible border in %s', async (theme) => {
 		setTheme(theme);
 		render(Input, { label: 'Name' });
-		const style = getComputedStyle(page.getByLabelText('Name').element());
-		expect(contrastRatio(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-		expect(contrastRatio(style.borderTopColor, style.backgroundColor)).toBeGreaterThanOrEqual(3);
+		const element = page.getByLabelText('Name').element();
+		const style = getComputedStyle(element);
+		const behind = effectiveBackground(element);
+		expect(contrastRatio(style.color, behind)).toBeGreaterThanOrEqual(4.5);
+		expect(contrastRatio(style.borderTopColor, behind)).toBeGreaterThanOrEqual(3);
+	});
+
+	it.each<Theme>(['light', 'dark'])('a compact input shows its border only on hover in %s', async (theme) => {
+		setTheme(theme);
+		render(Input, { label: 'Cell', compact: true });
+		const locator = page.getByLabelText('Cell');
+		expect(getComputedStyle(locator.element()).borderTopColor).toBe('rgba(0, 0, 0, 0)');
+		await locator.hover();
+		expect(getComputedStyle(locator.element()).borderTopColor).not.toBe('rgba(0, 0, 0, 0)');
+	});
+
+	it('has no background of its own in dark mode', async () => {
+		setTheme('dark');
+		render(Input, { label: 'Name' });
+		expect(getComputedStyle(page.getByLabelText('Name').element()).backgroundColor).toBe('rgba(0, 0, 0, 0)');
 	});
 });
