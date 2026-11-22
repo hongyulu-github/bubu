@@ -18,9 +18,10 @@ export type ParseError = 'blank' | 'not-a-number' | 'negative-quantity';
 
 export type ParseResult = { ok: true; value: Decimal } | { ok: false; error: ParseError };
 
-// Plain decimal notation only: optional sign, digits, optional fraction ("5.", ".5" and "5.25" are
-// fine). No exponents, thousands separators, "NaN" or "Infinity".
-const DECIMAL_PATTERN = /^([+-])?(?:(\d+)(?:\.(\d*))?|\.(\d+))$/;
+// Plain decimal notation: optional sign, digits, optional fraction ("5.", ".5", "5.25" and "5,25" are
+// fine). Either "." or "," is the decimal point, independent of the browser locale, so a Spanish
+// keypad's "12,5" and "12.5" both mean 12.5. No exponents, thousands separators, "NaN" or "Infinity".
+const DECIMAL_PATTERN = /^([+-])?(?:(\d+)(?:[.,](\d*))?|[.,](\d+))$/;
 
 /** Parse committed text into a Decimal, rejecting blank and non-numeric input. */
 export function parseDecimal(text: string): ParseResult {
